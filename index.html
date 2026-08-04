@@ -1,0 +1,615 @@
+<!DOCTYPE html>
+<html lang="he" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>מהמדים לקורות חיים</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Heebo:wght@400;600;800&family=Assistant:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --navy:#16233A;
+    --navy-mid:#2C4058;
+    --paper:#EEF0EA;
+    --paper-card:#FFFFFF;
+    --olive:#6B7A4F;
+    --olive-dark:#57623F;
+    --bronze:#B5793B;
+    --line:#D8D9D2;
+    --text:#1B2230;
+    --text-muted:#5B6270;
+    --danger:#9C4A3A;
+  }
+  *{box-sizing:border-box;}
+  body{
+    margin:0;
+    background:var(--paper);
+    color:var(--text);
+    font-family:'Assistant',sans-serif;
+    line-height:1.5;
+  }
+  h1,h2,h3,.display{
+    font-family:'Heebo',sans-serif;
+  }
+
+  /* signature element: ribbon strip that shifts from service tones to paper tones */
+  .ribbon{
+    position:fixed;
+    top:0; right:0;
+    width:14px; height:100%;
+    display:flex; flex-direction:column;
+    z-index:5;
+  }
+  .ribbon span{flex:1;}
+  .ribbon span:nth-child(1){background:var(--navy);}
+  .ribbon span:nth-child(2){background:var(--olive);}
+  .ribbon span:nth-child(3){background:var(--bronze);}
+  .ribbon span:nth-child(4){background:var(--navy-mid);}
+  .ribbon span:nth-child(5){background:var(--paper-card);}
+  @media (max-width:640px){ .ribbon{display:none;} }
+
+  .wrap{
+    max-width:760px;
+    margin:0 auto;
+    padding:56px 28px 100px;
+    margin-inline-end:14px;
+  }
+  @media (max-width:640px){ .wrap{margin-inline-end:0; padding:32px 18px 80px;} }
+
+  header.page-head{
+    margin-bottom:36px;
+  }
+  .eyebrow{
+    display:inline-flex;
+    align-items:center;
+    gap:8px;
+    font-size:13px;
+    font-weight:600;
+    letter-spacing:.02em;
+    color:var(--olive-dark);
+    background:rgba(107,122,79,0.1);
+    padding:5px 12px;
+    border-radius:100px;
+    margin-bottom:16px;
+  }
+  h1{
+    font-size:34px;
+    font-weight:800;
+    margin:0 0 12px;
+    color:var(--navy);
+  }
+  .lede{
+    font-size:16px;
+    color:var(--text-muted);
+    max-width:56ch;
+    margin:0;
+  }
+
+  /* step indicator - real sequence, so numbers are meaningful here */
+  .steps{
+    display:flex;
+    gap:10px;
+    margin:28px 0 8px;
+  }
+  .step{
+    flex:1;
+    text-align:center;
+    padding:10px 6px 12px;
+    border-radius:10px;
+    font-size:13px;
+    font-weight:600;
+    color:var(--text-muted);
+    background:var(--paper-card);
+    border:1px solid var(--line);
+    position:relative;
+  }
+  .step.active{
+    color:var(--navy);
+    border-color:var(--olive);
+    box-shadow:inset 0 0 0 1px var(--olive);
+  }
+  .step .num{
+    display:block;
+    font-family:'Heebo',sans-serif;
+    font-size:15px;
+    font-weight:800;
+    color:var(--olive-dark);
+    margin-bottom:2px;
+  }
+
+  section.card{
+    background:var(--paper-card);
+    border:1px solid var(--line);
+    border-radius:14px;
+    padding:26px 26px 8px;
+    margin-bottom:20px;
+  }
+  section.card h2{
+    font-size:18px;
+    font-weight:600;
+    margin:0 0 4px;
+    color:var(--navy);
+  }
+  section.card .card-sub{
+    font-size:13.5px;
+    color:var(--text-muted);
+    margin:0 0 20px;
+  }
+
+  .field{
+    margin-bottom:20px;
+  }
+  .field label{
+    display:block;
+    font-size:14px;
+    font-weight:600;
+    margin-bottom:6px;
+    color:var(--text);
+  }
+  .field .hint{
+    font-size:12.5px;
+    color:var(--text-muted);
+    margin:4px 0 0;
+  }
+  .field .error-msg{
+    display:none;
+    font-size:12.5px;
+    color:var(--danger);
+    margin:6px 0 0;
+    font-weight:600;
+  }
+  .field.invalid input, .field.invalid textarea{
+    border-color:var(--danger);
+    background:#FBF3F1;
+  }
+  .field.invalid .error-msg{
+    display:block;
+  }
+  input[type="text"], input[type="email"], input[type="tel"], textarea, select{
+    width:100%;
+    font-family:'Assistant',sans-serif;
+    font-size:15px;
+    padding:11px 13px;
+    border:1px solid var(--line);
+    border-radius:9px;
+    background:#FCFCFA;
+    color:var(--text);
+    transition:border-color .15s, box-shadow .15s;
+  }
+  input:focus, textarea:focus, select:focus{
+    outline:none;
+    border-color:var(--olive);
+    box-shadow:0 0 0 3px rgba(107,122,79,0.18);
+  }
+  textarea{ resize:vertical; min-height:78px; }
+
+  .row2{
+    display:grid;
+    grid-template-columns:1fr 1fr;
+    gap:16px;
+  }
+  @media (max-width:560px){ .row2{grid-template-columns:1fr;} }
+
+  /* progressive disclosure toggle */
+  .toggle-field{
+    border:1px solid var(--line);
+    border-radius:10px;
+    padding:14px 16px;
+    margin-bottom:20px;
+    background:#FBFBF9;
+  }
+  .toggle-head{
+    display:flex;
+    align-items:center;
+    gap:10px;
+    cursor:pointer;
+    user-select:none;
+  }
+  .toggle-head input[type="checkbox"]{
+    width:18px; height:18px;
+    accent-color:var(--olive);
+    cursor:pointer;
+  }
+  .toggle-head span.label{
+    font-size:14.5px;
+    font-weight:600;
+  }
+  .toggle-detail{
+    display:none;
+    margin-top:12px;
+    padding-inline-start:28px;
+  }
+  .toggle-detail.open{ display:block; }
+
+  .actions{
+    position:sticky;
+    bottom:0;
+    background:linear-gradient(to top, var(--paper) 60%, transparent);
+    padding:24px 0 4px;
+    margin-top:8px;
+  }
+  button.primary{
+    width:100%;
+    font-family:'Heebo',sans-serif;
+    font-size:16px;
+    font-weight:700;
+    color:#fff;
+    background:var(--navy);
+    border:none;
+    border-radius:11px;
+    padding:16px;
+    cursor:pointer;
+    transition:background .15s, transform .1s;
+  }
+  button.primary:hover{ background:var(--navy-mid); }
+  button.primary:active{ transform:scale(0.99); }
+  .actions .note{
+    text-align:center;
+    font-size:12.5px;
+    color:var(--text-muted);
+    margin-top:10px;
+  }
+
+  .required-mark{ color:var(--danger); }
+
+  button.primary[disabled]{
+    background:var(--navy-mid);
+    opacity:.75;
+    cursor:wait;
+  }
+  .spinner{
+    display:inline-block;
+    width:15px; height:15px;
+    border:2px solid rgba(255,255,255,.4);
+    border-top-color:#fff;
+    border-radius:50%;
+    animation:spin .7s linear infinite;
+    margin-inline-end:8px;
+    vertical-align:-2px;
+  }
+  @keyframes spin{ to{ transform:rotate(360deg); } }
+
+  .error-banner{
+    display:none;
+    background:#FBF3F1;
+    border:1px solid var(--danger);
+    color:var(--danger);
+    border-radius:10px;
+    padding:14px 16px;
+    font-size:14px;
+    font-weight:600;
+    margin-bottom:16px;
+  }
+  .error-banner.show{ display:block; }
+
+  .result-box{
+    white-space:pre-wrap;
+    font-size:15px;
+    line-height:1.7;
+    border:1px solid var(--line);
+    border-radius:10px;
+    padding:20px 22px;
+    margin-bottom:16px;
+    background:#FCFCFA;
+    min-height:200px;
+  }
+  .result-box:focus{
+    outline:none;
+    border-color:var(--olive);
+    box-shadow:0 0 0 3px rgba(107,122,79,0.18);
+  }
+  .result-actions{
+    display:flex;
+    gap:12px;
+    margin-bottom:20px;
+  }
+  button.secondary{
+    flex:1;
+    font-family:'Assistant',sans-serif;
+    font-size:14.5px;
+    font-weight:600;
+    color:var(--navy);
+    background:#fff;
+    border:1px solid var(--line);
+    border-radius:9px;
+    padding:12px;
+    cursor:pointer;
+    transition:border-color .15s, background .15s;
+  }
+  button.secondary:hover{ border-color:var(--olive); background:#F7F8F4; }
+
+  @media print{
+    .ribbon, .steps, form, header.page-head, .card-sub, .result-actions{ display:none !important; }
+    body{ background:#fff; }
+    #resultCard{ border:none; padding:0; }
+    .result-box{ border:none; padding:0; }
+  }
+</style>
+</head>
+<body>
+
+<div class="ribbon"><span></span><span></span><span></span><span></span><span></span></div>
+
+<div class="wrap">
+  <header class="page-head">
+    <span class="eyebrow">כלי ליצירת קורות חיים לפורשי צה"ל</span>
+    <h1>מהמדים לקורות חיים</h1>
+    <p class="lede">מלאו פרטים על השירות והתפקיד שלכם, ותקבלו טיוטת קורות חיים אזרחיים מנוסחים ומוכנים לעריכה. בשלב הבא תוכלו גם להתאים אותם למשרה או תפקיד ספציפי.</p>
+  </header>
+
+  <div class="steps">
+    <div class="step active"><span class="num">1</span> פרטי השירות</div>
+    <div class="step"><span class="num">2</span> קורות חיים גנריים</div>
+    <div class="step"><span class="num">3</span> התאמה לתפקיד (רשות)</div>
+  </div>
+
+  <form id="cvForm">
+
+    <section class="card">
+      <h2>פרטים אישיים</h2>
+      <p class="card-sub">יופיעו בראש קורות החיים</p>
+
+      <div class="field">
+        <label for="fullName">שם מלא <span class="required-mark">*</span></label>
+        <input type="text" id="fullName" required>
+        <p class="error-msg" id="fullNameError">יש להזין אותיות בלבד (עברית או אנגלית)</p>
+      </div>
+
+      <div class="row2">
+        <div class="field">
+          <label for="phone">טלפון <span class="required-mark">*</span></label>
+          <input type="tel" id="phone" required placeholder="050-1234567">
+          <p class="error-msg" id="phoneError">מספר טלפון לא תקין - יש להזין 9 או 10 ספרות</p>
+        </div>
+        <div class="field">
+          <label for="email">אימייל <span class="required-mark">*</span></label>
+          <input type="email" id="email" required placeholder="name@example.com">
+          <p class="error-msg" id="emailError">כתובת אימייל לא תקינה</p>
+        </div>
+      </div>
+    </section>
+
+    <section class="card">
+      <h2>השירות הצבאי</h2>
+      <p class="card-sub">הבסיס לתרגום התפקיד שלכם לשפה אזרחית</p>
+
+      <div class="row2">
+        <div class="field">
+          <label for="rank">דרגה סופית <span class="required-mark">*</span></label>
+          <input type="text" id="rank" required placeholder="לדוגמה: רס״ן">
+          <p class="error-msg" id="rankError">שדה חובה</p>
+        </div>
+        <div class="field">
+          <label for="years">שנות שירות <span class="required-mark">*</span></label>
+          <input type="text" id="years" required placeholder="לדוגמה: 2004–2024">
+          <p class="error-msg" id="yearsError">שדה חובה</p>
+        </div>
+      </div>
+
+      <div class="field">
+        <label for="role">תפקיד אחרון / עיקרי <span class="required-mark">*</span></label>
+        <textarea id="role" required placeholder="לדוגמה: קצין לוגיסטיקה בגדוד, אחראי על אספקה ותחזוקה"></textarea>
+        <p class="error-msg" id="roleError">שדה חובה</p>
+      </div>
+
+      <div class="field">
+        <label for="rolesHistory">תפקידים מרכזיים נוספים לאורך השירות</label>
+        <textarea id="rolesHistory" placeholder="אם היו כמה תפקידים משמעותיים - פרטו בקצרה כל אחד"></textarea>
+        <p class="hint">לא חובה - רלוונטי אם השירות כלל כמה תחנות משמעותיות</p>
+      </div>
+    </section>
+
+    <section class="card">
+      <h2>ניהול ואחריות</h2>
+      <p class="card-sub">זה מה שהופך לרוב לניסוח החזק ביותר בקורות חיים אזרחיים</p>
+
+      <div class="toggle-field">
+        <label class="toggle-head">
+          <input type="checkbox" class="toggle-trigger" data-target="peopleDetail">
+          <span class="label">ניהלתי / פיקדתי על אנשים</span>
+        </label>
+        <div class="toggle-detail" id="peopleDetail">
+          <textarea placeholder="כמה אנשים? באיזו מסגרת? (לדוגמה: פיקוד על 45 חיילים בשלושה צוותים)"></textarea>
+        </div>
+      </div>
+
+      <div class="toggle-field">
+        <label class="toggle-head">
+          <input type="checkbox" class="toggle-trigger" data-target="budgetDetail">
+          <span class="label">ניהלתי תקציב, ציוד או רכש</span>
+        </label>
+        <div class="toggle-detail" id="budgetDetail">
+          <textarea placeholder="היקף התקציב/הציוד, ולמה הייתם אחראים"></textarea>
+        </div>
+      </div>
+
+      <div class="toggle-field">
+        <label class="toggle-head">
+          <input type="checkbox" class="toggle-trigger" data-target="trainingDetail">
+          <span class="label">הדרכתי, בניתי תוכנית הכשרה או העברתי קורסים</span>
+        </label>
+        <div class="toggle-detail" id="trainingDetail">
+          <textarea placeholder="למי הדרכתם, ובאיזה נושא"></textarea>
+        </div>
+      </div>
+
+      <div class="field">
+        <label for="achievements">הישג או פרויקט שאתם הכי גאים בו</label>
+        <textarea id="achievements" placeholder="לדוגמה: הובלתי מעבר למערכת מלאי דיגיטלית שקיצרה זמני אספקה ב-30%"></textarea>
+        <p class="hint">תוצאה מדידה (זמן, כסף, איכות) עוזרת מאוד - אבל לא חובה</p>
+      </div>
+    </section>
+
+    <section class="card">
+      <h2>כישורים והשכלה</h2>
+
+      <div class="field">
+        <label for="skills">כישורים טכניים ומקצועיים</label>
+        <textarea id="skills" placeholder="מערכות, תוכנות, כלים - לדוגמה: Excel, ניהול פרויקטים, מערכות מידע צבאיות"></textarea>
+      </div>
+
+      <div class="field">
+        <label for="education">השכלה אזרחית</label>
+        <textarea id="education" placeholder="תואר, לימודים - כולל אם עדיין בתהליך"></textarea>
+      </div>
+
+      <div class="field">
+        <label for="courses">קורסים והכשרות צבאיים בעלי ערך אזרחי</label>
+        <textarea id="courses" placeholder="קורס קצינים, קורס ניהול, הכשרות טכניות וכו׳"></textarea>
+      </div>
+
+      <div class="field">
+        <label for="languages">שפות נוספות</label>
+        <input type="text" id="languages" placeholder="לדוגמה: אנגלית - שוטפת, ערבית - בסיסית">
+      </div>
+    </section>
+
+    <div class="actions">
+      <p class="error-banner" id="apiError">אירעה שגיאה ביצירת קורות החיים. בדוק/י את החיבור לאינטרנט ונסה/י שוב.</p>
+      <button type="submit" class="primary" id="submitBtn">צור קורות חיים גנריים</button>
+      <p class="note" id="submitNote">הפקת קורות החיים אורכת כ-5-15 שניות</p>
+    </div>
+
+  </form>
+
+  <section class="card" id="resultCard" style="display:none;">
+    <h2>קורות החיים שלך</h2>
+    <p class="card-sub">זו טיוטת בסיס - חשוב לעבור עליה ולערוך ישירות בתוך הטקסט לפני העתקה או הדפסה</p>
+    <div id="resultBox" class="result-box" contenteditable="true"></div>
+    <div class="result-actions">
+      <button type="button" class="secondary" id="copyBtn">העתק טקסט</button>
+      <button type="button" class="secondary" id="printBtn">הדפס / שמור כ-PDF</button>
+    </div>
+  </section>
+</div>
+
+<script>
+  document.querySelectorAll('.toggle-trigger').forEach(cb=>{
+    cb.addEventListener('change', ()=>{
+      const target = document.getElementById(cb.dataset.target);
+      target.classList.toggle('open', cb.checked);
+    });
+  });
+
+  const validators = {
+    fullName: v => /^[a-zA-Zא-ת][a-zA-Zא-ת\s'׳\-]*$/.test(v.trim()) && v.trim().length > 0,
+    phone: v => {
+      const digits = v.replace(/\D/g, '');
+      return digits.length === 9 || digits.length === 10;
+    },
+    email: v => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v.trim()),
+    rank: v => v.trim().length > 0,
+    years: v => v.trim().length > 0,
+    role: v => v.trim().length > 0
+  };
+
+  function validateField(id){
+    const el = document.getElementById(id);
+    const field = el.closest('.field');
+    const isValid = validators[id](el.value);
+    field.classList.toggle('invalid', !isValid);
+    return isValid;
+  }
+
+  // clear error as soon as the person fixes it
+  Object.keys(validators).forEach(id=>{
+    const el = document.getElementById(id);
+    el.addEventListener('input', ()=>{
+      if (el.closest('.field').classList.contains('invalid')) validateField(id);
+    });
+  });
+
+  function val(id){ return document.getElementById(id).value.trim(); }
+  function checkedDetail(triggerTarget){
+    const cb = document.querySelector(`.toggle-trigger[data-target="${triggerTarget}"]`);
+    if (!cb.checked) return null;
+    return document.querySelector(`#${triggerTarget} textarea`).value.trim() || 'כן, ללא פירוט נוסף';
+  }
+
+  function collectData(){
+    return {
+      fullName: val('fullName'),
+      phone: val('phone'),
+      email: val('email'),
+      rank: val('rank'),
+      years: val('years'),
+      role: val('role'),
+      rolesHistory: val('rolesHistory'),
+      managedPeople: checkedDetail('peopleDetail'),
+      managedBudget: checkedDetail('budgetDetail'),
+      training: checkedDetail('trainingDetail'),
+      achievements: val('achievements'),
+      skills: val('skills'),
+      education: val('education'),
+      courses: val('courses'),
+      languages: val('languages')
+    };
+  }
+
+  async function generateResume(data){
+    const response = await fetch('/api/generate', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(data)
+    });
+
+    const result = await response.json();
+    if (!response.ok || !result.resume) {
+      throw new Error(result.error || 'generation failed');
+    }
+    return result.resume;
+  }
+
+  document.getElementById('cvForm').addEventListener('submit', async (e)=>{
+    e.preventDefault();
+    const ids = Object.keys(validators);
+    const results = ids.map(validateField);
+    const firstInvalidIndex = results.indexOf(false);
+
+    if (firstInvalidIndex !== -1) {
+      document.getElementById(ids[firstInvalidIndex]).closest('.field')
+        .scrollIntoView({behavior:'smooth', block:'center'});
+      return;
+    }
+
+    const btn = document.getElementById('submitBtn');
+    const errorBanner = document.getElementById('apiError');
+    errorBanner.classList.remove('show');
+    btn.disabled = true;
+    btn.innerHTML = '<span class="spinner"></span>יוצר קורות חיים...';
+
+    try {
+      const data = collectData();
+      const resumeText = await generateResume(data);
+
+      const resultCard = document.getElementById('resultCard');
+      document.getElementById('resultBox').textContent = resumeText;
+      resultCard.style.display = '';
+      document.querySelectorAll('.step')[1].classList.add('active');
+      resultCard.scrollIntoView({behavior:'smooth', block:'start'});
+    } catch (err) {
+      console.error(err);
+      errorBanner.classList.add('show');
+    } finally {
+      btn.disabled = false;
+      btn.textContent = 'צור קורות חיים גנריים';
+    }
+  });
+
+  document.getElementById('copyBtn').addEventListener('click', ()=>{
+    const text = document.getElementById('resultBox').innerText;
+    navigator.clipboard.writeText(text).then(()=>{
+      const btn = document.getElementById('copyBtn');
+      const original = btn.textContent;
+      btn.textContent = 'הועתק ✓';
+      setTimeout(()=>{ btn.textContent = original; }, 1800);
+    });
+  });
+
+  document.getElementById('printBtn').addEventListener('click', ()=>{
+    window.print();
+  });
+</script>
+
+</body>
+</html>
