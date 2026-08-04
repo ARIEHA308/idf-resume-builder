@@ -318,11 +318,45 @@
   }
   button.secondary:hover{ border-color:var(--olive); background:#F7F8F4; }
 
+  #printHint{
+    text-align:center;
+    margin-top:-6px;
+    font-size:12.5px;
+    color:var(--text-muted);
+  }
+
+  .next-wrap{
+    text-align:center;
+    margin:8px 0 40px;
+  }
+  .next-wrap button{
+    max-width:280px;
+    margin:0 auto;
+  }
+
+  .credit{
+    text-align:center;
+    font-size:12px;
+    color:var(--text-muted);
+    letter-spacing:.04em;
+    padding:0 0 20px;
+  }
+
   @media print{
-    .ribbon, .steps, form, header.page-head, .card-sub, .result-actions{ display:none !important; }
+    .ribbon, .steps, form, header.page-head, .card-sub, .result-actions,
+    #tailorCard, .next-wrap, #printHint, .credit{ display:none !important; }
     body{ background:#fff; }
     #resultCard{ border:none; padding:0; }
     .result-box{ border:none; padding:0; }
+
+    /* בהדפסת הגרסה המותאמת - מסתירים את הכרטיס הגנרי ומראים רק את כרטיס ההתאמה */
+    body.printing-tailored #resultCard{ display:none !important; }
+    body.printing-tailored #tailorCard{ display:block !important; }
+    body.printing-tailored #tailorCard .field, body.printing-tailored #tailorCard h2:first-of-type,
+    body.printing-tailored #tailorCard .card-sub, body.printing-tailored #tailorBtn,
+    body.printing-tailored #tailorError{ display:none !important; }
+    body.printing-tailored #tailorResultWrap{ display:block !important; margin-top:0 !important; }
+    body.printing-tailored .result-actions{ display:none !important; }
   }
 </style>
 </head>
@@ -478,9 +512,35 @@
     <div id="resultBox" class="result-box" contenteditable="true"></div>
     <div class="result-actions">
       <button type="button" class="secondary" id="copyBtn">העתק טקסט</button>
-      <button type="button" class="secondary" id="printBtn">הדפס / שמור כ-PDF</button>
+      <button type="button" class="secondary" id="printBtn">שמור כ-PDF / הדפס</button>
+    </div>
+    <p class="hint" id="printHint">בחלון שנפתח, תחת "יעד" / "Destination" בחר/י באפשרות <strong>"שמור כ-PDF" / "Save as PDF"</strong> במקום מדפסת פיזית</p>
+  </section>
+
+  <section class="card" id="tailorCard" style="display:none;">
+    <h2>שלב 3 (רשות) - התאמה למשרה או תפקיד</h2>
+    <p class="card-sub">הדביקו מודעת דרושים, או תארו את התפקיד שאתם מחפשים - וקורות החיים יותאמו ויודגשו בהתאם. הגרסה הגנרית למעלה תישאר כמו שהיא.</p>
+    <div class="field">
+      <label for="targetJob">משרה או תפקיד רצוי</label>
+      <textarea id="targetJob" placeholder="הדביקו כאן מודעת דרושים, או תארו את סוג התפקיד שאתם מחפשים"></textarea>
+    </div>
+    <p class="error-banner" id="tailorError">אירעה שגיאה בהתאמת קורות החיים. נסה/י שוב.</p>
+    <button type="button" class="primary" id="tailorBtn">התאם קורות חיים למשרה</button>
+    <div id="tailorResultWrap" style="display:none; margin-top:22px;">
+      <h2>קורות החיים המותאמים</h2>
+      <div id="tailorResultBox" class="result-box" contenteditable="true"></div>
+      <div class="result-actions">
+        <button type="button" class="secondary" id="copyTailorBtn">העתק טקסט</button>
+        <button type="button" class="secondary" id="printTailorBtn">שמור כ-PDF / הדפס</button>
+      </div>
     </div>
   </section>
+
+  <div class="next-wrap">
+    <button type="button" class="secondary" id="nextBtn">התחל מחדש - פורש הבא</button>
+  </div>
+
+  <footer class="credit">VAN DAM מערכות</footer>
 </div>
 
 <script>
@@ -560,6 +620,20 @@
     return result.resume;
   }
 
+  async function tailorResume(baseResume, targetJob){
+    const response = await fetch('/api/generate', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ mode: 'tailor', baseResume, targetJob })
+    });
+
+    const result = await response.json();
+    if (!response.ok || !result.resume) {
+      throw new Error(result.error || 'tailoring failed');
+    }
+    return result.resume;
+  }
+
   document.getElementById('cvForm').addEventListener('submit', async (e)=>{
     e.preventDefault();
     const ids = Object.keys(validators);
@@ -583,8 +657,10 @@
       const resumeText = await generateResume(data);
 
       const resultCard = document.getElementById('resultCard');
+      const tailorCard = document.getElementById('tailorCard');
       document.getElementById('resultBox').textContent = resumeText;
       resultCard.style.display = '';
+      tailorCard.style.display = '';
       document.querySelectorAll('.step')[1].classList.add('active');
       resultCard.scrollIntoView({behavior:'smooth', block:'start'});
     } catch (err) {
@@ -607,7 +683,73 @@
   });
 
   document.getElementById('printBtn').addEventListener('click', ()=>{
+    document.body.classList.remove('printing-tailored');
     window.print();
+  });
+
+  document.getElementById('tailorBtn').addEventListener('click', async ()=>{
+    const targetJob = document.getElementById('targetJob').value.trim();
+    const errorBanner = document.getElementById('tailorError');
+    errorBanner.classList.remove('show');
+
+    if (!targetJob) {
+      document.getElementById('targetJob').closest('.field').scrollIntoView({behavior:'smooth', block:'center'});
+      return;
+    }
+
+    const btn = document.getElementById('tailorBtn');
+    btn.disabled = true;
+    btn.innerHTML = '<span class="spinner"></span>מתאים קורות חיים...';
+
+    try {
+      const baseResume = document.getElementById('resultBox').innerText;
+      const tailoredText = await tailorResume(baseResume, targetJob);
+
+      document.getElementById('tailorResultBox').textContent = tailoredText;
+      const wrap = document.getElementById('tailorResultWrap');
+      wrap.style.display = '';
+      document.querySelectorAll('.step')[2].classList.add('active');
+      wrap.scrollIntoView({behavior:'smooth', block:'start'});
+    } catch (err) {
+      console.error(err);
+      errorBanner.classList.add('show');
+    } finally {
+      btn.disabled = false;
+      btn.textContent = 'התאם קורות חיים למשרה';
+    }
+  });
+
+  document.getElementById('copyTailorBtn').addEventListener('click', ()=>{
+    const text = document.getElementById('tailorResultBox').innerText;
+    navigator.clipboard.writeText(text).then(()=>{
+      const btn = document.getElementById('copyTailorBtn');
+      const original = btn.textContent;
+      btn.textContent = 'הועתק ✓';
+      setTimeout(()=>{ btn.textContent = original; }, 1800);
+    });
+  });
+
+  document.getElementById('printTailorBtn').addEventListener('click', ()=>{
+    document.body.classList.add('printing-tailored');
+    window.print();
+  });
+
+  window.addEventListener('afterprint', ()=>{
+    document.body.classList.remove('printing-tailored');
+  });
+
+  document.getElementById('nextBtn').addEventListener('click', ()=>{
+    document.getElementById('cvForm').reset();
+    document.querySelectorAll('.toggle-detail').forEach(d => d.classList.remove('open'));
+    document.querySelectorAll('.field.invalid').forEach(f => f.classList.remove('invalid'));
+    document.getElementById('resultCard').style.display = 'none';
+    document.getElementById('tailorCard').style.display = 'none';
+    document.getElementById('tailorResultWrap').style.display = 'none';
+    document.getElementById('resultBox').textContent = '';
+    document.getElementById('tailorResultBox').textContent = '';
+    document.getElementById('targetJob').value = '';
+    document.querySelectorAll('.step').forEach((s, i) => s.classList.toggle('active', i === 0));
+    window.scrollTo({top: 0, behavior: 'smooth'});
   });
 </script>
 
