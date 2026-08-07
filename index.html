@@ -298,6 +298,42 @@
     border-color:var(--olive);
     box-shadow:0 0 0 3px rgba(107,122,79,0.18);
   }
+
+  /* תצוגת קורות חיים מובנית בתוך result-box */
+  .result-box .r-name{
+    font-family:'Heebo',sans-serif;
+    font-size:24px;
+    font-weight:800;
+    color:var(--navy);
+    margin:0 0 4px;
+  }
+  .result-box .r-contact{
+    font-size:14px;
+    color:var(--text-muted);
+    margin:0 0 18px;
+  }
+  .result-box .r-section{
+    font-family:'Heebo',sans-serif;
+    font-size:15px;
+    font-weight:700;
+    color:var(--olive-dark);
+    border-bottom:1px solid var(--line);
+    padding-bottom:6px;
+    margin:20px 0 10px;
+  }
+  .result-box .r-para{ margin:0 0 8px; }
+  .result-box .r-list{
+    margin:0 0 8px;
+    padding:0;
+    list-style:none;
+  }
+  .result-box .r-list li{ margin:0 0 6px; }
+
+  .linkedin-box{
+    border-top:1px dashed var(--line);
+    padding-top:18px;
+    margin-top:6px;
+  }
   .result-actions{
     display:flex;
     gap:12px;
@@ -342,9 +378,30 @@
     padding:0 0 20px;
   }
 
+  .gate{
+    position:fixed;
+    inset:0;
+    background:var(--paper);
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    z-index:100;
+    padding:20px;
+  }
+  .gate-box{
+    background:var(--paper-card);
+    border:1px solid var(--line);
+    border-radius:14px;
+    padding:32px 30px;
+    max-width:380px;
+    width:100%;
+  }
+  .gate-box .field{ margin-bottom:16px; }
+  .gate-box button{ width:100%; }
+
   @media print{
     .ribbon, .steps, form, header.page-head, .card-sub, .result-actions,
-    #tailorCard, .next-wrap, #printHint, .credit{ display:none !important; }
+    #tailorCard, .next-wrap, #printHint, .credit, .linkedin-box, .gate{ display:none !important; }
     body{ background:#fff; }
     #resultCard{ border:none; padding:0; }
     .result-box{ border:none; padding:0; }
@@ -362,9 +419,23 @@
 </head>
 <body>
 
+<div class="gate" id="gate">
+  <div class="gate-box">
+    <span class="eyebrow">כלי ליצירת קורות חיים לפורשי צה"ל</span>
+    <h1 style="font-size:24px;">כניסה</h1>
+    <p class="lede" style="margin-bottom:20px;">הכלי מיועד למשתתפי התוכנית בלבד. הזינו את הסיסמה שקיבלתם.</p>
+    <div class="field">
+      <label for="gatePassword">סיסמה</label>
+      <input type="password" id="gatePassword" autocomplete="off">
+      <p class="error-msg" id="gateError" style="display:none;">סיסמה שגויה, נסה/י שוב</p>
+    </div>
+    <button type="button" class="primary" id="gateBtn">כניסה</button>
+  </div>
+</div>
+
 <div class="ribbon"><span></span><span></span><span></span><span></span><span></span></div>
 
-<div class="wrap">
+<div class="wrap" id="mainWrap" style="display:none;">
   <header class="page-head">
     <span class="eyebrow">כלי ליצירת קורות חיים לפורשי צה"ל</span>
     <h1>מהמדים לקורות חיים</h1>
@@ -508,13 +579,26 @@
 
   <section class="card" id="resultCard" style="display:none;">
     <h2>קורות החיים שלך</h2>
-    <p class="card-sub">זו טיוטת בסיס - חשוב לעבור עליה ולערוך ישירות בתוך הטקסט לפני העתקה או הדפסה</p>
+    <p class="card-sub">זו טיוטת בסיס - חשוב לעבור עליה ולערוך ישירות בתוך הטקסט לפני הורדה או שליחה</p>
     <div id="resultBox" class="result-box" contenteditable="true"></div>
     <div class="result-actions">
       <button type="button" class="secondary" id="copyBtn">העתק טקסט</button>
+      <button type="button" class="secondary" id="wordBtn">הורד כקובץ Word</button>
       <button type="button" class="secondary" id="printBtn">שמור כ-PDF / הדפס</button>
     </div>
-    <p class="hint" id="printHint">בחלון שנפתח, תחת "יעד" / "Destination" בחר/י באפשרות <strong>"שמור כ-PDF" / "Save as PDF"</strong> במקום מדפסת פיזית</p>
+    <p class="hint" id="printHint">אם ההדפסה לא מציעה "שמור כ-PDF" - מומלץ להשתמש בכפתור "הורד כקובץ Word" למעלה, זה עובד תמיד</p>
+
+    <div class="linkedin-box">
+      <p class="card-sub" style="margin:0 0 12px;">אפשר גם ליצור תקציר קצר ל-LinkedIn, מבוסס על קורות החיים למעלה</p>
+      <button type="button" class="secondary" id="linkedinBtn">צור תקציר ל-LinkedIn</button>
+      <p class="error-banner" id="linkedinError">אירעה שגיאה ביצירת התקציר. נסה/י שוב.</p>
+      <div id="linkedinResultWrap" style="display:none; margin-top:16px;">
+        <div id="linkedinResultBox" class="result-box" contenteditable="true" style="white-space:pre-wrap;"></div>
+        <div class="result-actions">
+          <button type="button" class="secondary" id="copyLinkedinBtn">העתק טקסט</button>
+        </div>
+      </div>
+    </div>
   </section>
 
   <section class="card" id="tailorCard" style="display:none;">
@@ -531,6 +615,7 @@
       <div id="tailorResultBox" class="result-box" contenteditable="true"></div>
       <div class="result-actions">
         <button type="button" class="secondary" id="copyTailorBtn">העתק טקסט</button>
+        <button type="button" class="secondary" id="wordTailorBtn">הורד כקובץ Word</button>
         <button type="button" class="secondary" id="printTailorBtn">שמור כ-PDF / הדפס</button>
       </div>
     </div>
@@ -544,6 +629,59 @@
 </div>
 
 <script>
+  // ===== מסך כניסה (סיסמה) =====
+  let appPassword = sessionStorage.getItem('appPassword') || '';
+
+  function showMain(){
+    document.getElementById('gate').style.display = 'none';
+    document.getElementById('mainWrap').style.display = '';
+  }
+
+  async function checkPassword(pw){
+    const response = await fetch('/api/verify', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ password: pw })
+    });
+    const result = await response.json();
+    return response.ok && result.ok;
+  }
+
+  document.getElementById('gateBtn').addEventListener('click', async ()=>{
+    const pw = document.getElementById('gatePassword').value;
+    const btn = document.getElementById('gateBtn');
+    const err = document.getElementById('gateError');
+    err.style.display = 'none';
+    btn.disabled = true;
+    btn.textContent = 'בודק...';
+
+    try {
+      const ok = await checkPassword(pw);
+      if (ok) {
+        appPassword = pw;
+        sessionStorage.setItem('appPassword', pw);
+        showMain();
+      } else {
+        err.style.display = 'block';
+      }
+    } catch (e) {
+      err.textContent = 'שגיאת תקשורת, נסה/י שוב';
+      err.style.display = 'block';
+    } finally {
+      btn.disabled = false;
+      btn.textContent = 'כניסה';
+    }
+  });
+
+  document.getElementById('gatePassword').addEventListener('keydown', (e)=>{
+    if (e.key === 'Enter') document.getElementById('gateBtn').click();
+  });
+
+  // אם כבר אומתה סיסמה בטאב הזה - מדלגים ישר לתוכן, בלי לבזבז קריאה נוספת
+  if (appPassword) {
+    showMain();
+  }
+
   document.querySelectorAll('.toggle-trigger').forEach(cb=>{
     cb.addEventListener('change', ()=>{
       const target = document.getElementById(cb.dataset.target);
@@ -606,14 +744,104 @@
     };
   }
 
+  // ===== פיענוג ותצוגה של קורות חיים בפורמט מובנה =====
+  const SECTION_HEADERS = ['תקציר מקצועי', 'ניסיון תעסוקתי', 'תפקידים נוספים', 'כישורים', 'השכלה', 'הכשרות וקורסים', 'שפות'];
+
+  function parseResumeText(raw){
+    const nonEmpty = raw.split('\n').map(l => l.trim()).filter(l => l.length > 0);
+    const name = nonEmpty[0] || '';
+    const contact = nonEmpty[1] || '';
+    const sections = [];
+    let current = null;
+
+    for (let i = 2; i < nonEmpty.length; i++){
+      const line = nonEmpty[i];
+      if (SECTION_HEADERS.includes(line)){
+        current = { header: line, bullets: [], paragraphs: [] };
+        sections.push(current);
+      } else if (current){
+        if (line.startsWith('•')) current.bullets.push(line.replace(/^•\s*/, ''));
+        else current.paragraphs.push(line);
+      }
+    }
+    return { name, contact, sections };
+  }
+
+  function escapeHtml(s){
+    return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+  }
+
+  function renderResumeHTML(parsed){
+    let html = `<div class="r-name">${escapeHtml(parsed.name)}</div>`;
+    html += `<div class="r-contact">${escapeHtml(parsed.contact)}</div>`;
+    parsed.sections.forEach(sec => {
+      html += `<div class="r-section">${escapeHtml(sec.header)}</div>`;
+      sec.paragraphs.forEach(p => { html += `<div class="r-para">${escapeHtml(p)}</div>`; });
+      if (sec.bullets.length){
+        html += '<ul class="r-list">' + sec.bullets.map(b => `<li>• ${escapeHtml(b)}</li>`).join('') + '</ul>';
+      }
+    });
+    return html;
+  }
+
+  async function downloadWord(text, filenameBase){
+    const response = await fetch('/api/docx', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ text, password: appPassword })
+    });
+    if (response.status === 401){
+      sessionStorage.removeItem('appPassword');
+      document.getElementById('gate').style.display = 'flex';
+      document.getElementById('mainWrap').style.display = 'none';
+      return;
+    }
+    if (!response.ok){
+      alert('אירעה שגיאה ביצירת קובץ ה-Word. נסה/י שוב.');
+      return;
+    }
+    const blob = await response.blob();
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = filenameBase + '.docx';
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    URL.revokeObjectURL(url);
+  }
+
+  async function generateLinkedin(baseResume){
+    const response = await fetch('/api/generate', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ mode: 'linkedin', baseResume, password: appPassword })
+    });
+    const result = await response.json();
+    if (response.status === 401){
+      sessionStorage.removeItem('appPassword');
+      document.getElementById('gate').style.display = 'flex';
+      document.getElementById('mainWrap').style.display = 'none';
+      throw new Error('session expired');
+    }
+    if (!response.ok || !result.resume) throw new Error(result.error || 'linkedin failed');
+    return result.resume;
+  }
+
   async function generateResume(data){
     const response = await fetch('/api/generate', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(data)
+      body: JSON.stringify({ ...data, password: appPassword })
     });
 
     const result = await response.json();
+    if (response.status === 401) {
+      sessionStorage.removeItem('appPassword');
+      document.getElementById('gate').style.display = 'flex';
+      document.getElementById('mainWrap').style.display = 'none';
+      throw new Error('session expired');
+    }
     if (!response.ok || !result.resume) {
       throw new Error(result.error || 'generation failed');
     }
@@ -624,10 +852,16 @@
     const response = await fetch('/api/generate', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ mode: 'tailor', baseResume, targetJob })
+      body: JSON.stringify({ mode: 'tailor', baseResume, targetJob, password: appPassword })
     });
 
     const result = await response.json();
+    if (response.status === 401) {
+      sessionStorage.removeItem('appPassword');
+      document.getElementById('gate').style.display = 'flex';
+      document.getElementById('mainWrap').style.display = 'none';
+      throw new Error('session expired');
+    }
     if (!response.ok || !result.resume) {
       throw new Error(result.error || 'tailoring failed');
     }
@@ -658,7 +892,7 @@
 
       const resultCard = document.getElementById('resultCard');
       const tailorCard = document.getElementById('tailorCard');
-      document.getElementById('resultBox').textContent = resumeText;
+      document.getElementById('resultBox').innerHTML = renderResumeHTML(parseResumeText(resumeText));
       resultCard.style.display = '';
       tailorCard.style.display = '';
       document.querySelectorAll('.step')[1].classList.add('active');
@@ -687,6 +921,43 @@
     window.print();
   });
 
+  document.getElementById('wordBtn').addEventListener('click', ()=>{
+    const text = document.getElementById('resultBox').innerText;
+    const name = document.getElementById('fullName').value.trim() || 'קורות-חיים';
+    downloadWord(text, `קורות-חיים-${name}`);
+  });
+
+  document.getElementById('linkedinBtn').addEventListener('click', async ()=>{
+    const errorBanner = document.getElementById('linkedinError');
+    errorBanner.classList.remove('show');
+    const btn = document.getElementById('linkedinBtn');
+    btn.disabled = true;
+    btn.innerHTML = '<span class="spinner"></span>יוצר תקציר...';
+
+    try {
+      const baseResume = document.getElementById('resultBox').innerText;
+      const text = await generateLinkedin(baseResume);
+      document.getElementById('linkedinResultBox').textContent = text;
+      document.getElementById('linkedinResultWrap').style.display = '';
+    } catch (err) {
+      console.error(err);
+      errorBanner.classList.add('show');
+    } finally {
+      btn.disabled = false;
+      btn.textContent = 'צור תקציר ל-LinkedIn';
+    }
+  });
+
+  document.getElementById('copyLinkedinBtn').addEventListener('click', ()=>{
+    const text = document.getElementById('linkedinResultBox').innerText;
+    navigator.clipboard.writeText(text).then(()=>{
+      const btn = document.getElementById('copyLinkedinBtn');
+      const original = btn.textContent;
+      btn.textContent = 'הועתק ✓';
+      setTimeout(()=>{ btn.textContent = original; }, 1800);
+    });
+  });
+
   document.getElementById('tailorBtn').addEventListener('click', async ()=>{
     const targetJob = document.getElementById('targetJob').value.trim();
     const errorBanner = document.getElementById('tailorError');
@@ -705,7 +976,7 @@
       const baseResume = document.getElementById('resultBox').innerText;
       const tailoredText = await tailorResume(baseResume, targetJob);
 
-      document.getElementById('tailorResultBox').textContent = tailoredText;
+      document.getElementById('tailorResultBox').innerHTML = renderResumeHTML(parseResumeText(tailoredText));
       const wrap = document.getElementById('tailorResultWrap');
       wrap.style.display = '';
       document.querySelectorAll('.step')[2].classList.add('active');
@@ -734,6 +1005,12 @@
     window.print();
   });
 
+  document.getElementById('wordTailorBtn').addEventListener('click', ()=>{
+    const text = document.getElementById('tailorResultBox').innerText;
+    const name = document.getElementById('fullName').value.trim() || 'קורות-חיים';
+    downloadWord(text, `קורות-חיים-מותאמים-${name}`);
+  });
+
   window.addEventListener('afterprint', ()=>{
     document.body.classList.remove('printing-tailored');
   });
@@ -745,8 +1022,10 @@
     document.getElementById('resultCard').style.display = 'none';
     document.getElementById('tailorCard').style.display = 'none';
     document.getElementById('tailorResultWrap').style.display = 'none';
-    document.getElementById('resultBox').textContent = '';
-    document.getElementById('tailorResultBox').textContent = '';
+    document.getElementById('linkedinResultWrap').style.display = 'none';
+    document.getElementById('resultBox').innerHTML = '';
+    document.getElementById('tailorResultBox').innerHTML = '';
+    document.getElementById('linkedinResultBox').textContent = '';
     document.getElementById('targetJob').value = '';
     document.querySelectorAll('.step').forEach((s, i) => s.classList.toggle('active', i === 0));
     window.scrollTo({top: 0, behavior: 'smooth'});
