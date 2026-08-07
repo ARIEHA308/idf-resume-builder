@@ -1,5 +1,8 @@
 {
   "name": "idf-resume-builder",
   "version": "1.0.0",
-  "private": true
+  "private": true,
+  "dependencies": {
+    "docx": "^8.5.0"
+  }
 }
