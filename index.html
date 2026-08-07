@@ -448,6 +448,8 @@
     <div class="step"><span class="num">3</span> התאמה לתפקיד (רשות)</div>
   </div>
 
+  <button type="button" class="secondary" id="demoFillBtn" style="display:none; margin-bottom:20px;">מלא נתוני דוגמה (מצב בדיקה)</button>
+
   <form id="cvForm">
 
     <section class="card">
@@ -681,6 +683,73 @@
   if (appPassword) {
     showMain();
   }
+
+  // ===== מצב בדיקה (?demo=1) - מילוי אוטומטי לצורך בדיקות בלבד =====
+  const DEMO_PROFILES = [
+    {
+      fullName: 'ישראל ישראלי', phone: '0501234567', email: 'israel@example.com',
+      rank: 'רס"ן', years: '2002–2023', role: 'קצין אחזקה, חטיבת אש - צה"ל',
+      rolesHistory: 'מפקד פלוגת תחזוקה (2008-2012), קצין רכש ביחידה (2012-2016)',
+      managedPeople: 'ניהול ישיר של כ-45 חיילים וקצינים זוטרים',
+      managedBudget: 'ניהול תקציב תחזוקה שנתי של כ-8 מיליון ש"ח',
+      training: 'בניתי ומסרתי תוכנית הכשרה לטכנאי תחזוקה חדשים',
+      achievements: 'הובלתי מעבר למערכת ניהול מלאי דיגיטלית שקיצרה זמני תיקון ב-30%',
+      skills: 'Excel, ניהול פרויקטים, מערכות ERP צבאיות, SAP',
+      education: 'תואר ראשון בהנדסת תעשייה וניהול, האוניברסיטה הפתוחה (בהשלמה)',
+      courses: 'קורס קצינים, קורס ניהול משאבים, הכשרת בטיחות בעבודה',
+      languages: 'אנגלית - שוטפת'
+    },
+    {
+      fullName: 'דנה כהן', phone: '0529876543', email: 'dana.c@example.com',
+      rank: 'רס"ר', years: '2005–2025', role: 'מפקדת מערך גרירה וחילוץ',
+      rolesHistory: 'מפקדת כיתת חילוץ (2010-2015), רכזת הדרכה למערך (2015-2020)',
+      managedPeople: 'פיקוד על 25 חיילים בשלושה צוותי חילוץ',
+      managedBudget: '',
+      training: 'הדרכתי צוותי חילוץ חדשים בתרחישי חירום ותאונות דרכים',
+      achievements: 'תיאמתי מבצע חילוץ מורכב בתנאי שטח קשים שהוביל להצלת נפגעים ללא אבדות נוספות',
+      skills: 'ניהול צוותים בשטח, תיאום מבצעי חירום, עזרה ראשונה מתקדמת',
+      education: '',
+      courses: 'קורס מש"קיות חילוץ, הכשרת חובשים',
+      languages: 'ערבית - בסיסית'
+    },
+    {
+      fullName: 'אבי לוי', phone: '0541112233', email: 'avi.levi@example.com',
+      rank: 'סא"ל', years: '1999–2024', role: 'ראש ענף מבצעים במטה חטיבתי',
+      rolesHistory: '',
+      managedPeople: 'ניהול מטה של 12 קצינים ונגדים',
+      managedBudget: 'ניהול תקציב מבצעי רב-שנתי',
+      training: '',
+      achievements: '',
+      skills: 'תכנון אסטרטגי, ניתוח מודיעיני, PowerPoint, ניהול ישיבות בכירים',
+      education: 'תואר שני במנהל עסקים (בעיצומו)',
+      courses: 'פיקוד ומטה, קורס מנהלים בכירים',
+      languages: 'אנגלית - שוטפת, צרפתית - בסיסית'
+    }
+  ];
+
+  const demoBtn = document.getElementById('demoFillBtn');
+  if (new URLSearchParams(window.location.search).get('demo') === '1') {
+    demoBtn.style.display = '';
+  }
+  demoBtn.addEventListener('click', ()=>{
+    const profile = DEMO_PROFILES[Math.floor(Math.random() * DEMO_PROFILES.length)];
+    const specialKeys = ['managedPeople', 'managedBudget', 'training'];
+    Object.keys(profile).forEach(key => {
+      if (specialKeys.includes(key)) return;
+      const el = document.getElementById(key);
+      if (el) el.value = profile[key];
+    });
+    // שדות שיושבים בתוך תיבת "פירוט" (checkbox + textarea) - ממלאים ומסמנים בנפרד
+    [['peopleDetail','managedPeople'], ['budgetDetail','managedBudget'], ['trainingDetail','training']].forEach(([targetId, key])=>{
+      const cb = document.querySelector(`.toggle-trigger[data-target="${targetId}"]`);
+      const has = !!profile[key];
+      cb.checked = has;
+      document.getElementById(targetId).classList.toggle('open', has);
+      const textarea = document.querySelector(`#${targetId} textarea`);
+      if (textarea) textarea.value = profile[key] || '';
+    });
+    document.querySelectorAll('.field.invalid').forEach(f => f.classList.remove('invalid'));
+  });
 
   document.querySelectorAll('.toggle-trigger').forEach(cb=>{
     cb.addEventListener('change', ()=>{
