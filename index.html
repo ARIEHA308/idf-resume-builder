@@ -372,10 +372,13 @@
 
   .credit{
     text-align:center;
-    font-size:12px;
-    color:var(--text-muted);
-    letter-spacing:.04em;
-    padding:0 0 20px;
+    font-size:15px;
+    font-weight:700;
+    color:var(--navy);
+    letter-spacing:.06em;
+    padding:18px 0 24px;
+    border-top:1px solid var(--line);
+    margin-top:10px;
   }
 
   .gate{
@@ -574,7 +577,7 @@
     <div class="actions">
       <p class="error-banner" id="apiError">אירעה שגיאה ביצירת קורות החיים. בדוק/י את החיבור לאינטרנט ונסה/י שוב.</p>
       <button type="submit" class="primary" id="submitBtn">צור קורות חיים גנריים</button>
-      <p class="note" id="submitNote">הפקת קורות החיים אורכת כ-5-15 שניות</p>
+      <p class="note" id="submitNote">הפקת קורות החיים עשויה לקחת עד כ-30 שניות</p>
     </div>
 
   </form>
@@ -619,6 +622,18 @@
         <button type="button" class="secondary" id="copyTailorBtn">העתק טקסט</button>
         <button type="button" class="secondary" id="wordTailorBtn">הורד כקובץ Word</button>
         <button type="button" class="secondary" id="printTailorBtn">שמור כ-PDF / הדפס</button>
+      </div>
+
+      <div class="linkedin-box">
+        <p class="card-sub" style="margin:0 0 12px;">רוצה להתכונן לראיון על סמך ההתאמה הזו?</p>
+        <button type="button" class="secondary" id="interviewBtn">הכן אותי לראיון</button>
+        <p class="error-banner" id="interviewError">אירעה שגיאה בהכנת שאלות הראיון. נסה/י שוב.</p>
+        <div id="interviewResultWrap" style="display:none; margin-top:16px;">
+          <div id="interviewResultBox" class="result-box" contenteditable="true" style="white-space:pre-wrap;"></div>
+          <div class="result-actions">
+            <button type="button" class="secondary" id="copyInterviewBtn">העתק טקסט</button>
+          </div>
+        </div>
       </div>
     </div>
   </section>
@@ -897,6 +912,23 @@
     return result.resume;
   }
 
+  async function generateInterview(baseResume, targetJob){
+    const response = await fetch('/api/generate', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ mode: 'interview', baseResume, targetJob, password: appPassword })
+    });
+    const result = await response.json();
+    if (response.status === 401){
+      sessionStorage.removeItem('appPassword');
+      document.getElementById('gate').style.display = 'flex';
+      document.getElementById('mainWrap').style.display = 'none';
+      throw new Error('session expired');
+    }
+    if (!response.ok || !result.resume) throw new Error(result.error || 'interview prep failed');
+    return result.resume;
+  }
+
   async function generateResume(data){
     const response = await fetch('/api/generate', {
       method: 'POST',
@@ -1080,6 +1112,38 @@
     downloadWord(text, `קורות-חיים-מותאמים-${name}`);
   });
 
+  document.getElementById('interviewBtn').addEventListener('click', async ()=>{
+    const errorBanner = document.getElementById('interviewError');
+    errorBanner.classList.remove('show');
+    const btn = document.getElementById('interviewBtn');
+    btn.disabled = true;
+    btn.innerHTML = '<span class="spinner"></span>מכין שאלות...';
+
+    try {
+      const baseResume = document.getElementById('tailorResultBox').innerText;
+      const targetJob = document.getElementById('targetJob').value.trim();
+      const text = await generateInterview(baseResume, targetJob);
+      document.getElementById('interviewResultBox').textContent = text;
+      document.getElementById('interviewResultWrap').style.display = '';
+    } catch (err) {
+      console.error(err);
+      errorBanner.classList.add('show');
+    } finally {
+      btn.disabled = false;
+      btn.textContent = 'הכן אותי לראיון';
+    }
+  });
+
+  document.getElementById('copyInterviewBtn').addEventListener('click', ()=>{
+    const text = document.getElementById('interviewResultBox').innerText;
+    navigator.clipboard.writeText(text).then(()=>{
+      const btn = document.getElementById('copyInterviewBtn');
+      const original = btn.textContent;
+      btn.textContent = 'הועתק ✓';
+      setTimeout(()=>{ btn.textContent = original; }, 1800);
+    });
+  });
+
   window.addEventListener('afterprint', ()=>{
     document.body.classList.remove('printing-tailored');
   });
@@ -1092,9 +1156,11 @@
     document.getElementById('tailorCard').style.display = 'none';
     document.getElementById('tailorResultWrap').style.display = 'none';
     document.getElementById('linkedinResultWrap').style.display = 'none';
+    document.getElementById('interviewResultWrap').style.display = 'none';
     document.getElementById('resultBox').innerHTML = '';
     document.getElementById('tailorResultBox').innerHTML = '';
     document.getElementById('linkedinResultBox').textContent = '';
+    document.getElementById('interviewResultBox').textContent = '';
     document.getElementById('targetJob').value = '';
     document.querySelectorAll('.step').forEach((s, i) => s.classList.toggle('active', i === 0));
     window.scrollTo({top: 0, behavior: 'smooth'});
