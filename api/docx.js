@@ -1,7 +1,7 @@
 // בונה קובץ Word (.docx) אמיתי מהטקסט המוצג בדף (כולל עריכות ידניות) -
 // מפרש את אותה מוסכמת פורמט (כותרות סעיפים קבועות + בולטים "• ") שמ-generate.js.
 
-const { Document, Packer, Paragraph, HeadingLevel, AlignmentType } = require('docx');
+const { Document, Packer, Paragraph, TextRun, HeadingLevel, AlignmentType } = require('docx');
 
 const SECTION_HEADERS = ['תקציר מקצועי', 'ניסיון תעסוקתי', 'תפקידים נוספים', 'כישורים', 'השכלה', 'הכשרות וקורסים', 'שפות'];
 
@@ -28,6 +28,17 @@ function parseResumeText(raw) {
   return { name, contact, sections };
 }
 
+// עוזר: פסקה מיושרת לימין עם כיווניות RTL אמיתית, גם ברמת הפסקה וגם ברמת הריצה (run) -
+// זה מה שגורם ל-Word להציג נכון עברית מיושרת לימין ולא להיצמד לשמאל.
+function rtlParagraph(text, extra = {}) {
+  return new Paragraph({
+    alignment: AlignmentType.RIGHT,
+    bidirectional: true,
+    ...extra,
+    children: [new TextRun({ text, rightToLeft: true })]
+  });
+}
+
 module.exports = async (req, res) => {
   if (req.method !== 'POST') {
     res.status(405).json({ error: 'Method not allowed' });
@@ -52,42 +63,16 @@ module.exports = async (req, res) => {
     const parsed = parseResumeText(body.text);
     const children = [];
 
-    children.push(new Paragraph({
-      heading: HeadingLevel.TITLE,
-      alignment: AlignmentType.RIGHT,
-      bidirectional: true,
-      text: parsed.name
-    }));
-    children.push(new Paragraph({
-      alignment: AlignmentType.RIGHT,
-      bidirectional: true,
-      spacing: { after: 300 },
-      text: parsed.contact
-    }));
+    children.push(rtlParagraph(parsed.name, { heading: HeadingLevel.TITLE }));
+    children.push(rtlParagraph(parsed.contact, { spacing: { after: 300 } }));
 
     parsed.sections.forEach(sec => {
-      children.push(new Paragraph({
-        heading: HeadingLevel.HEADING_2,
-        alignment: AlignmentType.RIGHT,
-        bidirectional: true,
-        spacing: { before: 260, after: 120 },
-        text: sec.header
-      }));
+      children.push(rtlParagraph(sec.header, { heading: HeadingLevel.HEADING_2, spacing: { before: 260, after: 120 } }));
       sec.paragraphs.forEach(p => {
-        children.push(new Paragraph({
-          alignment: AlignmentType.RIGHT,
-          bidirectional: true,
-          spacing: { after: 120 },
-          text: p
-        }));
+        children.push(rtlParagraph(p, { spacing: { after: 120 } }));
       });
       sec.bullets.forEach(b => {
-        children.push(new Paragraph({
-          bullet: { level: 0 },
-          alignment: AlignmentType.RIGHT,
-          bidirectional: true,
-          text: b
-        }));
+        children.push(rtlParagraph(b, { bullet: { level: 0 } }));
       });
     });
 
