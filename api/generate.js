@@ -31,6 +31,13 @@ const LINKEDIN_SYSTEM_PROMPT = `אתה כותב תוכן מקצועי ל-LinkedI
 2. שורה ריקה, ואז פסקת "About" - 3-5 משפטים, בגוף ראשון (אני...), טון אישי ומקצועי, מבוסס אך ורק על מה שמופיע בקורות החיים שקיבלת - בלי להמציא ובלי להשתמש בראשי תיבות צבאיים.
 החזר את שני החלקים בלבד (כותרת + About), ללא Markdown, ללא כותרות סעיפים, ללא הערות נוספות.`;
 
+const INTERVIEW_SYSTEM_PROMPT = `אתה מכין מועמדים לראיונות עבודה. קיבלת קורות חיים מותאמים למשרה מסוימת, ותיאור המשרה/תפקיד עצמו.
+כתוב 4-6 שאלות ראיון סבירות שעשויות לעלות בראיון לתפקיד הזה, בהתבסס על הפער או הזיקה בין הניסיון בקורות החיים לבין דרישות המשרה.
+לכל שאלה כתוב:
+שאלה: <נוסח השאלה>
+נקודת מפתח: <משפט אחד - איך לענות תוך שימוש בניסיון הרלוונטי מקורות החיים, כולל טיפ קצר "לתרגם" ניסיון צבאי לשפה אזרחית אם רלוונטי>
+השאר שורה ריקה בין שאלה לשאלה. אל תמציא ניסיון שלא מופיע בקורות החיים. ללא Markdown, ללא הערות נוספות לפני או אחרי.`;
+
 function buildGeneratePrompt(data) {
   const lines = [
     `שם מלא: ${data.fullName || ''}`,
@@ -106,7 +113,7 @@ module.exports = async (req, res) => {
     return;
   }
 
-  const mode = ['tailor', 'linkedin'].includes(body.mode) ? body.mode : 'generate';
+  const mode = ['tailor', 'linkedin', 'interview'].includes(body.mode) ? body.mode : 'generate';
 
   try {
     if (mode === 'tailor') {
@@ -126,6 +133,17 @@ module.exports = async (req, res) => {
         return;
       }
       const text = await callClaude(LINKEDIN_SYSTEM_PROMPT, `קורות החיים:\n${body.baseResume}`);
+      res.status(200).json({ resume: text });
+      return;
+    }
+
+    if (mode === 'interview') {
+      if (!body.baseResume || !body.targetJob) {
+        res.status(400).json({ error: 'missing required fields' });
+        return;
+      }
+      const userContent = `קורות החיים המותאמים:\n${body.baseResume}\n\nהמשרה/תפקיד:\n${body.targetJob}`;
+      const text = await callClaude(INTERVIEW_SYSTEM_PROMPT, userContent);
       res.status(200).json({ resume: text });
       return;
     }
