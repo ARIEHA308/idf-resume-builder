@@ -1,7 +1,11 @@
 // בונה קובץ Word (.docx) אמיתי מהטקסט המוצג בדף (כולל עריכות ידניות) -
 // מפרש את אותה מוסכמת פורמט (כותרות סעיפים קבועות + בולטים "• ") שמ-generate.js.
+//
+// הערה טכנית: לא משתמשים בסגנונות המובנים של הספרייה (Title/Heading) - יש להם
+// באג ידוע (docx.js #3419) שבו כיווניות RTL לא "מושכת" איתה יישור לימין כשמשתמשים
+// בסגנון מוגדר-מראש. פותרים את זה עם עיצוב ישיר (bold/size) על כל פסקה בנפרד.
 
-const { Document, Packer, Paragraph, TextRun, HeadingLevel, AlignmentType } = require('docx');
+const { Document, Packer, Paragraph, TextRun, AlignmentType } = require('docx');
 
 const SECTION_HEADERS = ['תקציר מקצועי', 'ניסיון תעסוקתי', 'תפקידים נוספים', 'כישורים', 'השכלה', 'הכשרות וקורסים', 'שפות'];
 
@@ -28,14 +32,12 @@ function parseResumeText(raw) {
   return { name, contact, sections };
 }
 
-// עוזר: פסקה מיושרת לימין עם כיווניות RTL אמיתית, גם ברמת הפסקה וגם ברמת הריצה (run) -
-// זה מה שגורם ל-Word להציג נכון עברית מיושרת לימין ולא להיצמד לשמאל.
-function rtlParagraph(text, extra = {}) {
+function rtlParagraph(text, runOpts = {}, paraOpts = {}) {
   return new Paragraph({
     alignment: AlignmentType.RIGHT,
     bidirectional: true,
-    ...extra,
-    children: [new TextRun({ text, rightToLeft: true })]
+    ...paraOpts,
+    children: [new TextRun({ text, rightToLeft: true, ...runOpts })]
   });
 }
 
@@ -63,16 +65,16 @@ module.exports = async (req, res) => {
     const parsed = parseResumeText(body.text);
     const children = [];
 
-    children.push(rtlParagraph(parsed.name, { heading: HeadingLevel.TITLE }));
-    children.push(rtlParagraph(parsed.contact, { spacing: { after: 300 } }));
+    children.push(rtlParagraph(parsed.name, { bold: true, size: 36 }, { spacing: { after: 80 } }));
+    children.push(rtlParagraph(parsed.contact, { size: 20, color: '5B6270' }, { spacing: { after: 280 } }));
 
     parsed.sections.forEach(sec => {
-      children.push(rtlParagraph(sec.header, { heading: HeadingLevel.HEADING_2, spacing: { before: 260, after: 120 } }));
+      children.push(rtlParagraph(sec.header, { bold: true, size: 24, color: '57623F' }, { spacing: { before: 260, after: 120 } }));
       sec.paragraphs.forEach(p => {
-        children.push(rtlParagraph(p, { spacing: { after: 120 } }));
+        children.push(rtlParagraph(p, {}, { spacing: { after: 120 } }));
       });
       sec.bullets.forEach(b => {
-        children.push(rtlParagraph(b, { bullet: { level: 0 } }));
+        children.push(rtlParagraph(b, {}, { bullet: { level: 0 } }));
       });
     });
 
