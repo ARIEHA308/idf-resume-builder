@@ -4,8 +4,9 @@
 // הערות טכניות אחרי חקירה מעמיקה (כולל פירוק קובץ .docx אמיתי ובדיקת ה-XML הפנימי):
 // 1. לא משתמשים בסגנונות המובנים של הספרייה (Title/Heading) - עיצוב ישיר על כל פסקה.
 // 2. מגדירים כיווניות RTL גם כברירת מחדל של המסמך כולו (docDefaults) וגם על כל
-//    פסקה בנפרד באופן ישיר - כך שגם אם אפליקציית ה-Word שפותחת את הקובץ מסתמכת
-//    על ברירת המחדל של המסמך ולא רק על העיצוב הישיר, היא עדיין תקבל RTL נכון.
+//    פסקה בנפרד באופן ישיר.
+// 3. מגדירים גם את השפה כעברית (w:lang w:bidi="he-IL") - שכבה שלישית, בנוסף
+//    ליישור ולכיווניות, שנדרשת כדי ש-Word יתייחס לטקסט כעברית לכל דבר.
 
 const { Document, Packer, Paragraph, TextRun, AlignmentType } = require('docx');
 
@@ -76,7 +77,7 @@ module.exports = async (req, res) => {
         children.push(rtlParagraph(p, {}, { spacing: { after: 120 } }));
       });
       sec.bullets.forEach(b => {
-        children.push(rtlParagraph(`•  ${b}`, {}, { spacing: { after: 60 } }));
+        children.push(rtlParagraph(b, {}, { bullet: { level: 0 } }));
       });
     });
 
