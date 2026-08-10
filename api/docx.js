@@ -1,9 +1,11 @@
 // בונה קובץ Word (.docx) אמיתי מהטקסט המוצג בדף (כולל עריכות ידניות) -
 // מפרש את אותה מוסכמת פורמט (כותרות סעיפים קבועות + בולטים "• ") שמ-generate.js.
 //
-// הערה טכנית: לא משתמשים בסגנונות המובנים של הספרייה (Title/Heading) - יש להם
-// באג ידוע (docx.js #3419) שבו כיווניות RTL לא "מושכת" איתה יישור לימין כשמשתמשים
-// בסגנון מוגדר-מראש. פותרים את זה עם עיצוב ישיר (bold/size) על כל פסקה בנפרד.
+// הערות טכניות אחרי חקירה מעמיקה (כולל פירוק קובץ .docx אמיתי ובדיקת ה-XML הפנימי):
+// 1. לא משתמשים בסגנונות המובנים של הספרייה (Title/Heading) - עיצוב ישיר על כל פסקה.
+// 2. מגדירים כיווניות RTL גם כברירת מחדל של המסמך כולו (docDefaults) וגם על כל
+//    פסקה בנפרד באופן ישיר - כך שגם אם אפליקציית ה-Word שפותחת את הקובץ מסתמכת
+//    על ברירת המחדל של המסמך ולא רק על העיצוב הישיר, היא עדיין תקבל RTL נכון.
 
 const { Document, Packer, Paragraph, TextRun, AlignmentType } = require('docx');
 
@@ -78,7 +80,17 @@ module.exports = async (req, res) => {
       });
     });
 
-    const doc = new Document({ sections: [{ children }] });
+    const doc = new Document({
+      styles: {
+        default: {
+          document: {
+            run: { rightToLeft: true },
+            paragraph: { bidirectional: true, alignment: AlignmentType.RIGHT }
+          }
+        }
+      },
+      sections: [{ children }]
+    });
     const buffer = await Packer.toBuffer(doc);
 
     res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document');
