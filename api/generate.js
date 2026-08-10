@@ -32,11 +32,11 @@ const LINKEDIN_SYSTEM_PROMPT = `אתה כותב תוכן מקצועי ל-LinkedI
 החזר את שני החלקים בלבד (כותרת + About), ללא Markdown, ללא כותרות סעיפים, ללא הערות נוספות.`;
 
 const INTERVIEW_SYSTEM_PROMPT = `אתה מכין מועמדים לראיונות עבודה. קיבלת קורות חיים מותאמים למשרה מסוימת, ותיאור המשרה/תפקיד עצמו.
-כתוב 4-6 שאלות ראיון סבירות שעשויות לעלות בראיון לתפקיד הזה, בהתבסס על הפער או הזיקה בין הניסיון בקורות החיים לבין דרישות המשרה.
+כתוב 8 שאלות ראיון סבירות שעשויות לעלות בראיון לתפקיד הזה, בהתבסס על הפער או הזיקה בין הניסיון בקורות החיים לבין דרישות המשרה.
 לכל שאלה כתוב:
 שאלה: <נוסח השאלה>
-נקודת מפתח: <משפט אחד - איך לענות תוך שימוש בניסיון הרלוונטי מקורות החיים, כולל טיפ קצר "לתרגם" ניסיון צבאי לשפה אזרחית אם רלוונטי>
-השאר שורה ריקה בין שאלה לשאלה. אל תמציא ניסיון שלא מופיע בקורות החיים. ללא Markdown, ללא הערות נוספות לפני או אחרי.`;
+איך לענות: <2-3 משפטים שמסבירים איך המועמד יכול לענות בפועל, תוך שימוש ישיר בניסיון הספציפי שמופיע בקורות החיים שקיבלת (לא תשובה כללית) - כולל, אם רלוונטי, איך "לתרגם" את הניסיון הצבאי לשפה שמראיין אזרחי יבין>
+השאר שורה ריקה בין שאלה לשאלה. אל תמציא ניסיון שלא מופיע בקורות החיים - אם אין במה לתמוך תשובה חזקה לשאלה מסוימת, ציין זאת בכנות בתוך "איך לענות" והצע כיוון כללי בלבד. ללא Markdown, ללא הערות נוספות לפני או אחרי.`;
 
 function buildGeneratePrompt(data) {
   const lines = [
@@ -59,7 +59,7 @@ function buildGeneratePrompt(data) {
   return lines.join('\n');
 }
 
-async function callClaude(system, userContent) {
+async function callClaude(system, userContent, maxTokens = 1500) {
   const apiResponse = await fetch('https://api.anthropic.com/v1/messages', {
     method: 'POST',
     headers: {
@@ -69,7 +69,7 @@ async function callClaude(system, userContent) {
     },
     body: JSON.stringify({
       model: 'claude-sonnet-5',
-      max_tokens: 1500,
+      max_tokens: maxTokens,
       system,
       messages: [{ role: 'user', content: userContent }]
     })
@@ -143,7 +143,7 @@ module.exports = async (req, res) => {
         return;
       }
       const userContent = `קורות החיים המותאמים:\n${body.baseResume}\n\nהמשרה/תפקיד:\n${body.targetJob}`;
-      const text = await callClaude(INTERVIEW_SYSTEM_PROMPT, userContent);
+      const text = await callClaude(INTERVIEW_SYSTEM_PROMPT, userContent, 2200);
       res.status(200).json({ resume: text });
       return;
     }
