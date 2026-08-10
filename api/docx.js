@@ -4,8 +4,9 @@
 // הערות טכניות אחרי חקירה מעמיקה (כולל פירוק קובץ .docx אמיתי ובדיקת ה-XML הפנימי):
 // 1. לא משתמשים בסגנונות המובנים של הספרייה (Title/Heading) - עיצוב ישיר על כל פסקה.
 // 2. מגדירים כיווניות RTL גם כברירת מחדל של המסמך כולו (docDefaults) וגם על כל
-//    פסקה בנפרד באופן ישיר - כך שגם אם אפליקציית ה-Word שפותחת את הקובץ מסתמכת
-//    על ברירת המחדל של המסמך ולא רק על העיצוב הישיר, היא עדיין תקבל RTL נכון.
+//    פסקה בנפרד באופן ישיר.
+// 3. מגדירים גם את השפה כעברית (w:lang w:bidi="he-IL") - שכבה שלישית, בנוסף
+//    ליישור ולכיווניות, שנדרשת כדי ש-Word יתייחס לטקסט כעברית לכל דבר.
 
 const { Document, Packer, Paragraph, TextRun, AlignmentType } = require('docx');
 
@@ -39,7 +40,7 @@ function rtlParagraph(text, runOpts = {}, paraOpts = {}) {
     alignment: AlignmentType.RIGHT,
     bidirectional: true,
     ...paraOpts,
-    children: [new TextRun({ text, rightToLeft: true, ...runOpts })]
+    children: [new TextRun({ text, rightToLeft: true, language: { bidirectional: 'he-IL' }, ...runOpts })]
   });
 }
 
@@ -84,7 +85,7 @@ module.exports = async (req, res) => {
       styles: {
         default: {
           document: {
-            run: { rightToLeft: true },
+            run: { rightToLeft: true, language: { bidirectional: 'he-IL' } },
             paragraph: { bidirectional: true, alignment: AlignmentType.RIGHT }
           }
         }
