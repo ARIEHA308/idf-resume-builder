@@ -869,10 +869,10 @@
 <div class="generation-overlay" id="generationOverlay" aria-live="polite" aria-busy="true">
   <div class="generation-card">
     <div class="generation-spinner" aria-hidden="true"></div>
-    <h2>אנחנו בונים את קורות החיים שלך</h2>
+    <h2 id="generationTitle">אנחנו בונים את קורות החיים שלך</h2>
     <p id="generationStatus">מנתחים את הניסיון שמילאת...</p>
     <div class="generation-progress"><span></span></div>
-    <small>זה עשוי לקחת עד כחצי דקה. אין צורך ללחוץ שוב.</small>
+    <small id="generationNote">זה עשוי לקחת עד כחצי דקה. אין צורך ללחוץ שוב.</small>
   </div>
 </div>
 
@@ -1276,15 +1276,19 @@
   }
 
   let generationStatusTimer = null;
-  function showGenerationOverlay(){
+  function showGenerationOverlay(options = {}){
     const overlay = document.getElementById('generationOverlay');
+    const title = document.getElementById('generationTitle');
     const status = document.getElementById('generationStatus');
-    const messages = [
+    const note = document.getElementById('generationNote');
+    const messages = options.messages || [
       'מנתחים את הניסיון שמילאת...',
       'מתרגמים את הניסיון הצבאי לשפה אזרחית...',
       'מדגישים אחריות, ניהול והישגים...',
       'מסדרים את המידע לקורות חיים מקצועיים...'
     ];
+    title.textContent = options.title || 'אנחנו בונים את קורות החיים שלך';
+    note.textContent = options.note || 'זה עשוי לקחת עד כחצי דקה. אין צורך ללחוץ שוב.';
     let i = 0;
     status.textContent = messages[0];
     overlay.classList.add('show');
@@ -1485,6 +1489,16 @@
     const btn = document.getElementById('interviewBtn');
     btn.disabled = true;
     btn.innerHTML = '<span class="spinner"></span>מכין שאלות...';
+    showGenerationOverlay({
+      title: 'מכינים אותך לראיון',
+      messages: [
+        'קוראים את דרישות המשרה...',
+        'משווים אותן לניסיון שלך...',
+        'מזהים נקודות חוזקה ופערים...',
+        'מנסחים שאלות והכוונה לתשובות...'
+      ],
+      note: 'התהליך עשוי לקחת כמה עשרות שניות. אין צורך ללחוץ שוב.'
+    });
 
     try {
       const baseResume = document.getElementById('tailorResultBox').innerText;
@@ -1496,6 +1510,7 @@
       console.error(err);
       errorBanner.classList.add('show');
     } finally {
+      hideGenerationOverlay();
       btn.disabled = false;
       btn.textContent = 'הכן אותי לראיון';
     }
