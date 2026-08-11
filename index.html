@@ -493,6 +493,28 @@
   #tailorCard{display:none;}
   .next-wrap{margin-top:28px;}
 
+  .review-note{margin:14px 0 0;padding:11px 13px;border-radius:12px;background:#F7F8F4;color:var(--text-muted);font-size:13px;}
+
+  .generation-overlay{
+    position:fixed;inset:0;z-index:200;display:none;align-items:center;justify-content:center;
+    padding:20px;background:rgba(22,35,58,.28);backdrop-filter:blur(5px);
+  }
+  .generation-overlay.show{display:flex;}
+  .generation-card{
+    width:min(460px,100%);background:#fff;border:1px solid rgba(255,255,255,.8);border-radius:24px;
+    padding:34px 30px;text-align:center;box-shadow:0 24px 80px rgba(22,35,58,.22);
+  }
+  .generation-card h2{font-family:'Heebo',sans-serif;color:var(--navy);font-size:24px;margin:16px 0 8px;}
+  .generation-card p{margin:0 0 18px;color:var(--text-muted);font-size:15px;min-height:24px;}
+  .generation-card small{display:block;margin-top:14px;color:var(--text-muted);font-size:12.5px;}
+  .generation-spinner{
+    width:52px;height:52px;margin:0 auto;border-radius:50%;border:5px solid #E8EBE3;border-top-color:var(--olive);
+    animation:spin .8s linear infinite;
+  }
+  .generation-progress{height:7px;background:#E7E9E3;border-radius:999px;overflow:hidden;}
+  .generation-progress span{display:block;height:100%;width:38%;border-radius:999px;background:linear-gradient(90deg,var(--olive),#9AAA79);animation:genProgress 1.35s ease-in-out infinite;}
+  @keyframes genProgress{0%{transform:translateX(170%)}50%{transform:translateX(25%)}100%{transform:translateX(-170%)}}
+
   .mobile-only{display:none;}
 
   @media (max-width:800px){
@@ -700,11 +722,8 @@
     <section class="review-card" id="reviewCard">
       <h2>כמעט סיימנו</h2>
       <p class="card-sub">עברו על הפרטים לפני יצירת קורות החיים. אם משהו חסר, אפשר לחזור ולתקן.</p>
+      <p class="review-note">תזכורת: אין להזין מידע מסווג או רגיש.</p>
       <div class="review-grid" id="reviewGrid"></div>
-      <label class="privacy-check">
-        <input type="checkbox" id="privacyConfirm">
-        <span>אני מאשר/ת שלא הזנתי מידע מסווג או רגיש.</span>
-      </label>
     </section>
 
     <div class="wizard-nav" id="wizardNav">
@@ -789,11 +808,17 @@
     </div>
   </section>
 
-  <div class="next-wrap">
-    <button type="button" class="secondary" id="nextBtn">התחל מחדש - פורש הבא</button>
-  </div>
-
   <footer class="credit">VAN DAM מערכות</footer>
+</div>
+
+<div class="generation-overlay" id="generationOverlay" aria-live="polite" aria-busy="true">
+  <div class="generation-card">
+    <div class="generation-spinner" aria-hidden="true"></div>
+    <h2>אנחנו בונים את קורות החיים שלך</h2>
+    <p id="generationStatus">מנתחים את הניסיון שמילאת...</p>
+    <div class="generation-progress"><span></span></div>
+    <small>זה עשוי לקחת עד כחצי דקה. אין צורך ללחוץ שוב.</small>
+  </div>
 </div>
 
 <script>
@@ -934,7 +959,7 @@
     ['ספרו מה עשיתם בפועל','שם התפקיד חשוב, אבל חשוב יותר להסביר מה הייתה האחריות שלכם ביום יום ובאילו תחומים עסקתם.'],
     ['חפשו אחריות ותוצאה','ניהול אנשים, תקציב, ציוד, הדרכה או הובלת שינוי הם חומר מצוין לקורות חיים. תוצאה מדידה עוזרת, אבל אינה חובה.'],
     ['הוסיפו רק מה שרלוונטי','מערכות, תוכנות, תארים, קורסים ושפות יכולים לחזק את התמונה המקצועית. אין צורך למלא שדה שאין בו ערך.'],
-    ['בדיקה אחרונה','עברו על הסיכום ואשרו שלא הוזן מידע מסווג או רגיש. אחר כך ניצור את טיוטת קורות החיים.']
+    ['בדיקה אחרונה','עברו על הסיכום וודאו שהפרטים נכונים. אחר כך ניצור את טיוטת קורות החיים.']
   ];
   let wizardStep = 0;
 
@@ -994,10 +1019,6 @@
   document.getElementById('wizardNextBtn').addEventListener('click', ()=>{
     if (wizardStep < wizardPanels.length - 1){
       if (validateWizardStep(wizardStep)) setWizardStep(wizardStep + 1);
-      return;
-    }
-    if (!document.getElementById('privacyConfirm').checked){
-      alert('לפני יצירת קורות החיים יש לאשר שלא הוזן מידע מסווג או רגיש.');
       return;
     }
     document.getElementById('submitBtn').click();
@@ -1199,6 +1220,35 @@
     return result.resume;
   }
 
+  let generationStatusTimer = null;
+  function showGenerationOverlay(){
+    const overlay = document.getElementById('generationOverlay');
+    const status = document.getElementById('generationStatus');
+    const messages = [
+      'מנתחים את הניסיון שמילאת...',
+      'מתרגמים את הניסיון הצבאי לשפה אזרחית...',
+      'מדגישים אחריות, ניהול והישגים...',
+      'מסדרים את המידע לקורות חיים מקצועיים...'
+    ];
+    let i = 0;
+    status.textContent = messages[0];
+    overlay.classList.add('show');
+    document.body.style.overflow = 'hidden';
+    generationStatusTimer = setInterval(()=>{
+      i = (i + 1) % messages.length;
+      status.textContent = messages[i];
+    }, 3500);
+  }
+
+  function hideGenerationOverlay(){
+    document.getElementById('generationOverlay').classList.remove('show');
+    document.body.style.overflow = '';
+    if (generationStatusTimer){
+      clearInterval(generationStatusTimer);
+      generationStatusTimer = null;
+    }
+  }
+
   document.getElementById('cvForm').addEventListener('submit', async (e)=>{
     e.preventDefault();
     const ids = Object.keys(validators);
@@ -1216,6 +1266,7 @@
     errorBanner.classList.remove('show');
     btn.disabled = true;
     btn.innerHTML = '<span class="spinner"></span>יוצר קורות חיים...';
+    showGenerationOverlay();
 
     try {
       const data = collectData();
@@ -1231,6 +1282,7 @@
       console.error(err);
       errorBanner.classList.add('show');
     } finally {
+      hideGenerationOverlay();
       btn.disabled = false;
       btn.textContent = 'צור קורות חיים גנריים';
     }
@@ -1387,27 +1439,7 @@
     document.body.classList.remove('printing-tailored');
   });
 
-  document.getElementById('nextBtn').addEventListener('click', ()=>{
-    document.getElementById('cvForm').reset();
-    document.querySelectorAll('.toggle-detail').forEach(d => d.classList.remove('open'));
-    document.querySelectorAll('.field.invalid').forEach(f => f.classList.remove('invalid'));
-    document.getElementById('resultCard').style.display = 'none';
-    document.getElementById('tailorCard').style.display = 'none';
-    document.getElementById('tailorResultWrap').style.display = 'none';
-    document.getElementById('linkedinResultWrap').style.display = 'none';
-    document.getElementById('interviewResultWrap').style.display = 'none';
-    document.getElementById('resultBox').innerHTML = '';
-    document.getElementById('tailorResultBox').innerHTML = '';
-    document.getElementById('linkedinResultBox').textContent = '';
-    document.getElementById('interviewResultBox').textContent = '';
-    document.getElementById('targetJob').value = '';
-    document.getElementById('linkedinBox').style.display = 'none';
-    document.getElementById('privacyConfirm').checked = false;
-    document.getElementById('introScreen').style.display = 'grid';
-    document.getElementById('wizardShell').style.display = 'none';
-    wizardStep = 0;
-    window.scrollTo({top: 0, behavior: 'smooth'});
-  });
+
 </script>
 
 </body>
