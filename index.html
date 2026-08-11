@@ -515,6 +515,51 @@
   .generation-progress span{display:block;height:100%;width:38%;border-radius:999px;background:linear-gradient(90deg,var(--olive),#9AAA79);animation:genProgress 1.35s ease-in-out infinite;}
   @keyframes genProgress{0%{transform:translateX(170%)}50%{transform:translateX(25%)}100%{transform:translateX(-170%)}}
 
+  /* result action center */
+  body{background:
+    radial-gradient(circle at 88% 8%, rgba(107,122,79,.10), transparent 28%),
+    radial-gradient(circle at 10% 90%, rgba(44,64,88,.08), transparent 32%),
+    var(--paper);}
+  #resultCard{background:linear-gradient(180deg,#FFFFFF 0%,#FBFCF9 100%);border:1px solid #DADDD3;}
+  .result-ready{
+    display:flex;align-items:center;gap:10px;margin:0 0 18px;padding:13px 16px;
+    border-radius:14px;background:#EEF5E8;border:1px solid #D4E2C8;color:#425231;font-weight:700;
+  }
+  .result-ready .check{display:inline-grid;place-items:center;width:25px;height:25px;border-radius:50%;background:var(--olive);color:#fff;font-size:14px;}
+  .result-actions{margin-top:16px;}
+  .result-actions .result-primary{background:var(--navy);border-color:var(--navy);color:#fff;font-weight:700;}
+  .result-actions .result-primary:hover{background:var(--navy-mid);}
+  .next-actions-title{margin:24px 0 10px;padding-top:20px;border-top:1px solid var(--line);}
+  .next-actions-title h3{margin:0 0 4px;color:var(--navy);font-size:18px;}
+  .next-actions-title p{margin:0;color:var(--text-muted);font-size:13.5px;}
+  .result-next-actions{border-top:none;padding-top:0;margin-top:12px;}
+  .action-card{
+    min-height:82px!important;text-align:right!important;padding:15px 18px!important;border-radius:16px!important;
+    display:flex!important;flex-direction:column;align-items:flex-start;justify-content:center;gap:3px;
+  }
+  .action-card strong{font-size:16px;line-height:1.2;}
+  .action-card span{font-size:12.5px;font-weight:500;opacity:.82;line-height:1.45;}
+  .action-card.tailor-action{background:#657548!important;border-color:#657548!important;color:#fff!important;}
+  .action-card.tailor-action:hover{background:#58683E!important;}
+  .action-card.linkedin-action{background:#F0F5FA!important;border-color:#C9D9E8!important;color:#183A5A!important;}
+  .action-card.linkedin-action:hover{background:#E6F0F8!important;border-color:#AFC7DC!important;}
+  .linkedin-box{
+    border-color:#C9D9E8;background:linear-gradient(180deg,#F7FBFF 0%,#EEF6FC 100%);
+    padding:20px;border-radius:18px;
+  }
+  .linkedin-head{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:12px;}
+  .linkedin-head h3{margin:0;color:#183A5A;font-size:18px;}
+  .linkedin-status{margin:0;color:var(--text-muted);font-size:13.5px;}
+  .linkedin-loading{display:flex;align-items:center;gap:10px;padding:18px 0;color:#35536E;font-weight:600;}
+  .linkedin-loading .mini-spinner{width:20px;height:20px;border:3px solid #D6E5F1;border-top-color:#4B7596;border-radius:50%;animation:spin .7s linear infinite;}
+  #tailorCard{
+    background:linear-gradient(180deg,#FBFDF8 0%,#F3F7EC 100%);border:1px solid #D4DDC8;
+  }
+  #tailorCard h2:first-child{color:#4D5E38;}
+  #tailorCard textarea{background:#fff;}
+  .panel-close{background:transparent;border:none;color:var(--text-muted);font-family:'Assistant',sans-serif;cursor:pointer;font-size:13px;padding:5px 0;}
+  .panel-close:hover{color:var(--navy);}
+
   .mobile-only{display:none;}
 
   @media (max-width:800px){
@@ -748,36 +793,46 @@
   </div>
 
   <section class="card" id="resultCard" style="display:none;">
+    <div class="result-ready"><span class="check">✓</span><span>קורות החיים מוכנים</span></div>
     <h2>קורות החיים שלך</h2>
     <p class="card-sub">זו טיוטת בסיס - חשוב לעבור עליה ולערוך ישירות בתוך הטקסט לפני הורדה או שליחה</p>
     <div id="resultBox" class="result-box" contenteditable="true"></div>
     <div class="result-actions">
       <button type="button" class="secondary" id="copyBtn">העתק טקסט</button>
-      <button type="button" class="secondary" id="wordBtn">הורד כקובץ Word</button>
+      <button type="button" class="secondary result-primary" id="wordBtn">הורד כקובץ Word</button>
       <button type="button" class="secondary" id="printBtn">שמור כ-PDF / הדפס</button>
     </div>
     <p class="hint" id="printHint">אם ההדפסה לא מציעה "שמור כ-PDF" - מומלץ להשתמש בכפתור "הורד כקובץ Word" למעלה, זה עובד תמיד</p>
 
+    <div class="next-actions-title">
+      <h3>מה תרצה לעשות עכשיו?</h3>
+      <p>אפשר להתאים את קורות החיים למשרה מסוימת, או ליצור Bio מקצועי ל-LinkedIn.</p>
+    </div>
     <div class="result-next-actions">
-      <button type="button" class="secondary featured" id="openTailorBtn">התאם למשרה</button>
-      <button type="button" class="secondary" id="openLinkedinBtn">צור Bio ל-LinkedIn</button>
+      <button type="button" class="secondary action-card tailor-action" id="openTailorBtn"><strong>התאם למשרה</strong><span>הדבק מודעת דרושים או תאר תפקיד רצוי</span></button>
+      <button type="button" class="secondary action-card linkedin-action" id="openLinkedinBtn"><strong>צור Bio ל-LinkedIn</strong><span>תקציר מקצועי על בסיס קורות החיים</span></button>
     </div>
 
     <div class="linkedin-box" id="linkedinBox" style="display:none;">
-      <p class="card-sub" style="margin:0 0 12px;">אפשר גם ליצור תקציר קצר ל-LinkedIn, מבוסס על קורות החיים למעלה</p>
-      <button type="button" class="secondary" id="linkedinBtn">צור תקציר ל-LinkedIn</button>
+      <div class="linkedin-head">
+        <h3>Bio ל-LinkedIn</h3>
+        <button type="button" class="panel-close" id="closeLinkedinBtn">סגור</button>
+      </div>
+      <p class="linkedin-status" id="linkedinStatus">יוצרים תקציר מקצועי על בסיס קורות החיים...</p>
+      <div class="linkedin-loading" id="linkedinLoading"><span class="mini-spinner"></span><span>יוצר Bio...</span></div>
       <p class="error-banner" id="linkedinError">אירעה שגיאה ביצירת התקציר. נסה/י שוב.</p>
       <div id="linkedinResultWrap" style="display:none; margin-top:16px;">
-        <div id="linkedinResultBox" class="result-box" contenteditable="true" style="white-space:pre-wrap;"></div>
-        <div class="result-actions">
-          <button type="button" class="secondary" id="copyLinkedinBtn">העתק טקסט</button>
+        <div id="linkedinResultBox" class="result-box" contenteditable="true" style="white-space:pre-wrap;min-height:180px;"></div>
+        <div class="result-actions" style="grid-template-columns:1fr;">
+          <button type="button" class="secondary" id="copyLinkedinBtn">העתק Bio</button>
         </div>
       </div>
     </div>
   </section>
 
   <section class="card" id="tailorCard" style="display:none;">
-    <h2>שלב 3 (רשות) - התאמה למשרה או תפקיד</h2>
+    <button type="button" class="panel-close" id="closeTailorBtn">סגור התאמה למשרה</button>
+    <h2>התאמה למשרה או תפקיד</h2>
     <p class="card-sub">הדביקו מודעת דרושים, או תארו את התפקיד שאתם מחפשים - וקורות החיים יותאמו ויודגשו בהתאם. הגרסה הגנרית למעלה תישאר כמו שהיא.</p>
     <div class="field">
       <label for="targetJob">משרה או תפקיד רצוי</label>
@@ -1311,33 +1366,54 @@
 
 
   document.getElementById('openTailorBtn').addEventListener('click', ()=>{
-    document.getElementById('tailorCard').style.display = '';
-    document.getElementById('tailorCard').scrollIntoView({behavior:'smooth', block:'start'});
+    document.getElementById('linkedinBox').style.display = 'none';
+    const tailorCard = document.getElementById('tailorCard');
+    tailorCard.style.display = '';
+    tailorCard.scrollIntoView({behavior:'smooth', block:'start'});
   });
 
-  document.getElementById('openLinkedinBtn').addEventListener('click', ()=>{
-    document.getElementById('linkedinBox').style.display = '';
-    document.getElementById('linkedinBox').scrollIntoView({behavior:'smooth', block:'center'});
+  document.getElementById('closeTailorBtn').addEventListener('click', ()=>{
+    document.getElementById('tailorCard').style.display = 'none';
+    document.getElementById('resultCard').scrollIntoView({behavior:'smooth', block:'end'});
   });
 
-  document.getElementById('linkedinBtn').addEventListener('click', async ()=>{
+  document.getElementById('closeLinkedinBtn').addEventListener('click', ()=>{
+    document.getElementById('linkedinBox').style.display = 'none';
+  });
+
+  document.getElementById('openLinkedinBtn').addEventListener('click', async ()=>{
+    document.getElementById('tailorCard').style.display = 'none';
+    const box = document.getElementById('linkedinBox');
+    const loading = document.getElementById('linkedinLoading');
+    const status = document.getElementById('linkedinStatus');
+    const wrap = document.getElementById('linkedinResultWrap');
     const errorBanner = document.getElementById('linkedinError');
+    const btn = document.getElementById('openLinkedinBtn');
+
+    box.style.display = '';
     errorBanner.classList.remove('show');
-    const btn = document.getElementById('linkedinBtn');
+    wrap.style.display = 'none';
+    loading.style.display = 'flex';
+    status.textContent = 'יוצרים תקציר מקצועי על בסיס קורות החיים...';
     btn.disabled = true;
-    btn.innerHTML = '<span class="spinner"></span>יוצר תקציר...';
+    btn.querySelector('strong').textContent = 'יוצר Bio...';
+    box.scrollIntoView({behavior:'smooth', block:'center'});
 
     try {
       const baseResume = document.getElementById('resultBox').innerText;
       const text = await generateLinkedin(baseResume);
       document.getElementById('linkedinResultBox').textContent = text;
-      document.getElementById('linkedinResultWrap').style.display = '';
+      loading.style.display = 'none';
+      status.textContent = 'ה-Bio מוכן. אפשר לערוך אותו ישירות ולהעתיק ל-LinkedIn.';
+      wrap.style.display = '';
     } catch (err) {
       console.error(err);
+      loading.style.display = 'none';
+      status.textContent = 'לא הצלחנו ליצור את ה-Bio.';
       errorBanner.classList.add('show');
     } finally {
       btn.disabled = false;
-      btn.textContent = 'צור תקציר ל-LinkedIn';
+      btn.querySelector('strong').textContent = 'צור Bio ל-LinkedIn';
     }
   });
 
