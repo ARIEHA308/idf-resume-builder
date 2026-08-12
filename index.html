@@ -165,6 +165,51 @@
   .field.invalid .error-msg{
     display:block;
   }
+
+  .role-period-hint{ margin-top:-10px; margin-bottom:20px; }
+  .additional-roles-wrap{
+    margin-top:8px;
+    padding-top:18px;
+    border-top:1px solid var(--line);
+  }
+  .additional-roles-head{
+    display:flex;
+    align-items:center;
+    justify-content:space-between;
+    gap:16px;
+    margin-bottom:14px;
+  }
+  .additional-roles-head strong{ color:var(--navy); font-size:15px; }
+  .additional-roles-head .hint{ margin:4px 0 0; }
+  .add-role-btn{ flex:0 0 auto; padding:10px 14px; }
+  .additional-role-card{
+    background:#F8F9F5;
+    border:1px solid var(--line);
+    border-radius:13px;
+    padding:16px;
+    margin-bottom:14px;
+  }
+  .additional-role-title{
+    display:flex;
+    align-items:center;
+    justify-content:space-between;
+    gap:12px;
+    margin-bottom:12px;
+  }
+  .additional-role-title strong{ color:var(--navy); }
+  .remove-role-btn{
+    background:transparent;
+    border:none;
+    color:var(--danger);
+    font-family:'Assistant',sans-serif;
+    font-weight:600;
+    cursor:pointer;
+    padding:4px 6px;
+  }
+  @media (max-width:560px){
+    .additional-roles-head{align-items:flex-start;flex-direction:column;}
+    .add-role-btn{width:100%;}
+  }
   input[type="text"], input[type="email"], input[type="tel"], textarea, select{
     width:100%;
     font-family:'Assistant',sans-serif;
@@ -692,10 +737,27 @@
         <p class="error-msg" id="roleError">שדה חובה</p>
       </div>
 
-      <div class="field">
-        <label for="rolesHistory">תפקידים מרכזיים נוספים לאורך השירות</label>
-        <textarea id="rolesHistory" placeholder="אם היו כמה תפקידים משמעותיים - פרטו בקצרה כל אחד"></textarea>
-        <p class="hint">לא חובה - רלוונטי אם השירות כלל כמה תחנות משמעותיות</p>
+      <div class="row2 role-period-row">
+        <div class="field">
+          <label for="roleFrom">משנת</label>
+          <input type="text" id="roleFrom" inputmode="numeric" placeholder="לדוגמה: 2020">
+        </div>
+        <div class="field">
+          <label for="roleTo">עד שנת</label>
+          <input type="text" id="roleTo" inputmode="numeric" placeholder="לדוגמה: 2026">
+        </div>
+      </div>
+      <p class="hint role-period-hint">לא חובה אם זה התפקיד היחיד. מומלץ למלא אם מוסיפים תפקידים נוספים.</p>
+
+      <div class="additional-roles-wrap">
+        <div class="additional-roles-head">
+          <div>
+            <strong>תפקידים מרכזיים נוספים לאורך השירות</strong>
+            <p class="hint">אפשר להוסיף כל תפקיד בנפרד, כולל השנים שבהן ביצעתם אותו.</p>
+          </div>
+          <button type="button" class="secondary add-role-btn" id="addRoleBtn">+ הוסף תפקיד נוסף</button>
+        </div>
+        <div id="additionalRoles"></div>
       </div>
     </section>
 
@@ -1011,7 +1073,7 @@
   const wizardPanels = [...wizardSections, reviewCard];
   const wizardHelpContent = [
     ['הפרטים שיופיעו בראש המסמך','בדקו שהטלפון והאימייל מעודכנים. אין צורך להוסיף כתובת מלאה או פרטים אישיים שאינם נדרשים.'],
-    ['ספרו מה עשיתם בפועל','שם התפקיד חשוב, אבל חשוב יותר להסביר מה הייתה האחריות שלכם ביום יום ובאילו תחומים עסקתם.'],
+    ['ספרו על מסלול השירות','השאירו את שנות השירות הכוללות, ואם היו כמה תפקידים משמעותיים הוסיפו כל אחד בנפרד עם התקופה שלו.'],
     ['חפשו אחריות ותוצאה','ניהול אנשים, תקציב, ציוד, הדרכה או הובלת שינוי הם חומר מצוין לקורות חיים. תוצאה מדידה עוזרת, אבל אינה חובה.'],
     ['הוסיפו רק מה שרלוונטי','מערכות, תוכנות, תארים, קורסים ושפות יכולים לחזק את התמונה המקצועית. אין צורך למלא שדה שאין בו ערך.'],
     ['בדיקה אחרונה','עברו על הסיכום וודאו שהפרטים נכונים. אחר כך ניצור את טיוטת קורות החיים.']
@@ -1050,6 +1112,37 @@
         return false;
       }
     }
+
+    // אם נוספו תפקידים נוספים, השנים של כל תחנה הופכות לחיוניות
+    if (step === 1 && document.querySelectorAll('.additional-role-card').length){
+      const mainPeriodFields = [document.getElementById('roleFrom'), document.getElementById('roleTo')];
+      for (const field of mainPeriodFields){
+        if (!field.value.trim()){
+          field.setCustomValidity('כאשר מוסיפים תפקידים נוספים, יש לציין גם את תקופת התפקיד האחרון.');
+          field.reportValidity();
+          field.focus();
+          field.addEventListener('input', ()=>field.setCustomValidity(''), { once:true });
+          return false;
+        }
+      }
+      const cards = Array.from(document.querySelectorAll('.additional-role-card'));
+      for (const card of cards){
+        const required = [
+          card.querySelector('.additional-role-name'),
+          card.querySelector('.additional-role-from'),
+          card.querySelector('.additional-role-to')
+        ];
+        for (const field of required){
+          if (!field.value.trim()){
+            field.setCustomValidity('יש למלא שם תפקיד ומשנת התחלה וסיום.');
+            field.reportValidity();
+            field.focus();
+            field.addEventListener('input', ()=>field.setCustomValidity(''), { once:true });
+            return false;
+          }
+        }
+      }
+    }
     return true;
   }
 
@@ -1057,9 +1150,19 @@
     const d = collectData();
     const esc = (x)=>escapeHtml(x || 'לא צוין');
     const management = [d.managedPeople && `ניהול אנשים: ${d.managedPeople}`, d.managedBudget && `תקציב/ציוד: ${d.managedBudget}`, d.training && `הדרכה: ${d.training}`, d.achievements && `הישג: ${d.achievements}`].filter(Boolean).join('\n') || 'לא צוין';
+    const mainRolePeriod = [d.roleFrom, d.roleTo].filter(Boolean).join('–');
+    const additional = (d.additionalRoles || []).map(r => {
+      const period = [r.from, r.to].filter(Boolean).join('–');
+      return [r.name, period && `(${period})`].filter(Boolean).join(' ');
+    }).filter(Boolean);
+    const serviceSummary = [
+      `${d.rank} | ${d.years}`,
+      [d.role, mainRolePeriod && `(${mainRolePeriod})`].filter(Boolean).join(' '),
+      ...additional
+    ].filter(Boolean).join('\n');
     document.getElementById('reviewGrid').innerHTML = `
       <div class="review-item"><h3>פרטים אישיים</h3><p>${esc(d.fullName)}\n${esc(d.phone)}\n${esc(d.email)}</p></div>
-      <div class="review-item"><h3>שירות</h3><p>${esc(d.rank)} | ${esc(d.years)}\n${esc(d.role)}</p></div>
+      <div class="review-item"><h3>שירות</h3><p>${esc(serviceSummary)}</p></div>
       <div class="review-item"><h3>ניהול והישגים</h3><p>${esc(management)}</p></div>
       <div class="review-item"><h3>כישורים והשכלה</h3><p>${esc([d.skills,d.education,d.courses,d.languages].filter(Boolean).join('\n') || 'לא צוין')}</p></div>`;
   }
@@ -1114,6 +1217,58 @@
     return document.querySelector(`#${triggerTarget} textarea`).value.trim() || 'כן, ללא פירוט נוסף';
   }
 
+  let additionalRoleCount = 0;
+
+  function addAdditionalRole(data = {}){
+    additionalRoleCount += 1;
+    const id = additionalRoleCount;
+    const wrap = document.getElementById('additionalRoles');
+    const card = document.createElement('div');
+    card.className = 'additional-role-card';
+    card.dataset.roleId = id;
+    card.innerHTML = `
+      <div class="additional-role-title">
+        <strong>תפקיד נוסף ${id}</strong>
+        <button type="button" class="remove-role-btn">הסר</button>
+      </div>
+      <div class="field">
+        <label>שם התפקיד</label>
+        <input type="text" class="additional-role-name" placeholder="לדוגמה: מפקד מערך תחזוקה" value="${escapeHtml(data.name || '')}">
+      </div>
+      <div class="row2">
+        <div class="field">
+          <label>משנת</label>
+          <input type="text" inputmode="numeric" class="additional-role-from" placeholder="לדוגמה: 2014" value="${escapeHtml(data.from || '')}">
+        </div>
+        <div class="field">
+          <label>עד שנת</label>
+          <input type="text" inputmode="numeric" class="additional-role-to" placeholder="לדוגמה: 2020" value="${escapeHtml(data.to || '')}">
+        </div>
+      </div>
+      <div class="field">
+        <label>מה עשית בתפקיד?</label>
+        <textarea class="additional-role-description" placeholder="תחומי אחריות, צוותים, פרויקטים, ממשקים ותוצאות">${escapeHtml(data.description || '')}</textarea>
+      </div>
+      <div class="field" style="margin-bottom:0;">
+        <label>הישג מרכזי בתפקיד <span class="hint">(לא חובה)</span></label>
+        <textarea class="additional-role-achievement" placeholder="לדוגמה: הובלתי שינוי שקיצר זמני טיפול או שיפר זמינות">${escapeHtml(data.achievement || '')}</textarea>
+      </div>`;
+    card.querySelector('.remove-role-btn').addEventListener('click', ()=>card.remove());
+    wrap.appendChild(card);
+  }
+
+  function collectAdditionalRoles(){
+    return Array.from(document.querySelectorAll('.additional-role-card')).map(card => ({
+      name: card.querySelector('.additional-role-name').value.trim(),
+      from: card.querySelector('.additional-role-from').value.trim(),
+      to: card.querySelector('.additional-role-to').value.trim(),
+      description: card.querySelector('.additional-role-description').value.trim(),
+      achievement: card.querySelector('.additional-role-achievement').value.trim()
+    })).filter(role => role.name || role.from || role.to || role.description || role.achievement);
+  }
+
+  document.getElementById('addRoleBtn').addEventListener('click', ()=>addAdditionalRole());
+
   function collectData(){
     return {
       fullName: val('fullName'),
@@ -1122,7 +1277,9 @@
       rank: val('rank'),
       years: val('years'),
       role: val('role'),
-      rolesHistory: val('rolesHistory'),
+      roleFrom: val('roleFrom'),
+      roleTo: val('roleTo'),
+      additionalRoles: collectAdditionalRoles(),
       managedPeople: checkedDetail('peopleDetail'),
       managedBudget: checkedDetail('budgetDetail'),
       training: checkedDetail('trainingDetail'),
