@@ -1,450 +1,1694 @@
-// בונה קובץ Word (.docx) ידנית, ברמת ה-XML הגולמי - בלי להשתמש בספריית docx
-// ובלי docxtemplater. הסיבה: שתי הספריות הראו התנהגות RTL לא עקבית/לא צפויה.
-//
-// RTL מוגדר בשלוש רמות בו-זמנית:
-// 1. docDefaults ב-styles.xml
-// 2. כל פסקה בנפרד: w:bidi + w:jc="start" + w:rtl
-// 3. ה-section עצמו עם w:bidi
-//
-// שינויי העיצוב בגרסה הזו:
-// - שם ופרטי קשר ממורכזים
-// - יותר רווח בין סעיפים
-// - יותר רווח בין בולטים
-// - ריווח שורות נעים יותר
-// - שוליים מעט רחבים יותר
-//
-// שאר מנגנון ה-RTL נשאר ללא שינוי.
+<!DOCTYPE html>
+<html lang="he" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>מהמדים לקורות חיים</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Heebo:wght@400;600;800&family=Assistant:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --navy:#16233A;
+    --navy-mid:#2C4058;
+    --paper:#EEF0EA;
+    --paper-card:#FFFFFF;
+    --olive:#6B7A4F;
+    --olive-dark:#57623F;
+    --bronze:#B5793B;
+    --line:#D8D9D2;
+    --text:#1B2230;
+    --text-muted:#5B6270;
+    --danger:#9C4A3A;
+  }
+  *{box-sizing:border-box;}
+  body{
+    margin:0;
+    background:var(--paper);
+    color:var(--text);
+    font-family:'Assistant',sans-serif;
+    line-height:1.5;
+  }
+  h1,h2,h3,.display{
+    font-family:'Heebo',sans-serif;
+  }
 
-const JSZip = require('jszip');
+  /* signature element: ribbon strip that shifts from service tones to paper tones */
+  .ribbon{
+    position:fixed;
+    top:0; right:0;
+    width:14px; height:100%;
+    display:flex; flex-direction:column;
+    z-index:5;
+  }
+  .ribbon span{flex:1;}
+  .ribbon span:nth-child(1){background:var(--navy);}
+  .ribbon span:nth-child(2){background:var(--olive);}
+  .ribbon span:nth-child(3){background:var(--bronze);}
+  .ribbon span:nth-child(4){background:var(--navy-mid);}
+  .ribbon span:nth-child(5){background:var(--paper-card);}
+  @media (max-width:640px){ .ribbon{display:none;} }
 
-const SECTION_HEADERS = [
-  'תקציר מקצועי',
-  'ניסיון תעסוקתי',
-  'תפקידים נוספים',
-  'כישורים',
-  'השכלה',
-  'הכשרות וקורסים',
-  'שפות'
-];
+  .wrap{
+    max-width:760px;
+    margin:0 auto;
+    padding:56px 28px 100px;
+    margin-inline-end:14px;
+  }
+  @media (max-width:640px){ .wrap{margin-inline-end:0; padding:32px 18px 80px;} }
 
-function parseResumeText(raw) {
-  const nonEmpty = raw
-    .split('\n')
-    .map(l => l.trim())
-    .filter(l => l.length > 0);
+  header.page-head{
+    margin-bottom:36px;
+  }
+  .eyebrow{
+    display:inline-flex;
+    align-items:center;
+    gap:8px;
+    font-size:13px;
+    font-weight:600;
+    letter-spacing:.02em;
+    color:var(--olive-dark);
+    background:rgba(107,122,79,0.1);
+    padding:5px 12px;
+    border-radius:100px;
+    margin-bottom:16px;
+  }
+  h1{
+    font-size:34px;
+    font-weight:800;
+    margin:0 0 12px;
+    color:var(--navy);
+  }
+  .lede{
+    font-size:16px;
+    color:var(--text-muted);
+    max-width:56ch;
+    margin:0;
+  }
 
-  const name = nonEmpty[0] || '';
-  const contact = nonEmpty[1] || '';
+  /* step indicator - real sequence, so numbers are meaningful here */
+  .steps{
+    display:flex;
+    gap:10px;
+    margin:28px 0 8px;
+  }
+  .step{
+    flex:1;
+    text-align:center;
+    padding:10px 6px 12px;
+    border-radius:10px;
+    font-size:13px;
+    font-weight:600;
+    color:var(--text-muted);
+    background:var(--paper-card);
+    border:1px solid var(--line);
+    position:relative;
+  }
+  .step.active{
+    color:var(--navy);
+    border-color:var(--olive);
+    box-shadow:inset 0 0 0 1px var(--olive);
+  }
+  .step .num{
+    display:block;
+    font-family:'Heebo',sans-serif;
+    font-size:15px;
+    font-weight:800;
+    color:var(--olive-dark);
+    margin-bottom:2px;
+  }
 
-  const sections = [];
-  let current = null;
+  section.card{
+    background:var(--paper-card);
+    border:1px solid var(--line);
+    border-radius:14px;
+    padding:26px 26px 8px;
+    margin-bottom:20px;
+  }
+  section.card h2{
+    font-size:18px;
+    font-weight:600;
+    margin:0 0 4px;
+    color:var(--navy);
+  }
+  section.card .card-sub{
+    font-size:13.5px;
+    color:var(--text-muted);
+    margin:0 0 20px;
+  }
 
-  for (let i = 2; i < nonEmpty.length; i++) {
-    const line = nonEmpty[i];
+  .field{
+    margin-bottom:20px;
+  }
+  .field label{
+    display:block;
+    font-size:14px;
+    font-weight:600;
+    margin-bottom:6px;
+    color:var(--text);
+  }
+  .field .hint{
+    font-size:12.5px;
+    color:var(--text-muted);
+    margin:4px 0 0;
+  }
+  .field .error-msg{
+    display:none;
+    font-size:12.5px;
+    color:var(--danger);
+    margin:6px 0 0;
+    font-weight:600;
+  }
+  .field.invalid input, .field.invalid textarea{
+    border-color:var(--danger);
+    background:#FBF3F1;
+  }
+  .field.invalid .error-msg{
+    display:block;
+  }
 
-    if (SECTION_HEADERS.includes(line)) {
-      current = {
-        header: line,
-        bullets: [],
-        paragraphs: []
-      };
+  .role-period-hint{ margin-top:-10px; margin-bottom:20px; }
+  .additional-roles-wrap{
+    margin-top:8px;
+    padding-top:18px;
+    border-top:1px solid var(--line);
+  }
+  .additional-roles-head{
+    display:flex;
+    align-items:center;
+    justify-content:space-between;
+    gap:16px;
+    margin-bottom:14px;
+  }
+  .additional-roles-head strong{ color:var(--navy); font-size:15px; }
+  .additional-roles-head .hint{ margin:4px 0 0; }
+  .add-role-btn{ flex:0 0 auto; padding:10px 14px; }
+  .additional-role-card{
+    background:#F8F9F5;
+    border:1px solid var(--line);
+    border-radius:13px;
+    padding:16px;
+    margin-bottom:14px;
+  }
+  .additional-role-title{
+    display:flex;
+    align-items:center;
+    justify-content:space-between;
+    gap:12px;
+    margin-bottom:12px;
+  }
+  .additional-role-title strong{ color:var(--navy); }
+  .remove-role-btn{
+    background:transparent;
+    border:none;
+    color:var(--danger);
+    font-family:'Assistant',sans-serif;
+    font-weight:600;
+    cursor:pointer;
+    padding:4px 6px;
+  }
+  @media (max-width:560px){
+    .additional-roles-head{align-items:flex-start;flex-direction:column;}
+    .add-role-btn{width:100%;}
+  }
+  input[type="text"], input[type="email"], input[type="tel"], textarea, select{
+    width:100%;
+    font-family:'Assistant',sans-serif;
+    font-size:15px;
+    padding:11px 13px;
+    border:1px solid var(--line);
+    border-radius:9px;
+    background:#FCFCFA;
+    color:var(--text);
+    transition:border-color .15s, box-shadow .15s;
+  }
+  input:focus, textarea:focus, select:focus{
+    outline:none;
+    border-color:var(--olive);
+    box-shadow:0 0 0 3px rgba(107,122,79,0.18);
+  }
+  textarea{ resize:vertical; min-height:78px; }
 
-      sections.push(current);
-    } else if (current) {
-      if (line.startsWith('•')) {
-        current.bullets.push(
-          line.replace(/^•\s*/, '')
-        );
+  .row2{
+    display:grid;
+    grid-template-columns:1fr 1fr;
+    gap:16px;
+  }
+  @media (max-width:560px){ .row2{grid-template-columns:1fr;} }
+
+  /* progressive disclosure toggle */
+  .toggle-field{
+    border:1px solid var(--line);
+    border-radius:10px;
+    padding:14px 16px;
+    margin-bottom:20px;
+    background:#FBFBF9;
+  }
+  .toggle-head{
+    display:flex;
+    align-items:center;
+    gap:10px;
+    cursor:pointer;
+    user-select:none;
+  }
+  .toggle-head input[type="checkbox"]{
+    width:18px; height:18px;
+    accent-color:var(--olive);
+    cursor:pointer;
+  }
+  .toggle-head span.label{
+    font-size:14.5px;
+    font-weight:600;
+  }
+  .toggle-detail{
+    display:none;
+    margin-top:12px;
+    padding-inline-start:28px;
+  }
+  .toggle-detail.open{ display:block; }
+
+  .actions{
+    position:sticky;
+    bottom:0;
+    background:linear-gradient(to top, var(--paper) 60%, transparent);
+    padding:24px 0 4px;
+    margin-top:8px;
+  }
+  button.primary{
+    width:100%;
+    font-family:'Heebo',sans-serif;
+    font-size:16px;
+    font-weight:700;
+    color:#fff;
+    background:var(--navy);
+    border:none;
+    border-radius:11px;
+    padding:16px;
+    cursor:pointer;
+    transition:background .15s, transform .1s;
+  }
+  button.primary:hover{ background:var(--navy-mid); }
+  button.primary:active{ transform:scale(0.99); }
+  .actions .note{
+    text-align:center;
+    font-size:12.5px;
+    color:var(--text-muted);
+    margin-top:10px;
+  }
+
+  .required-mark{ color:var(--danger); }
+
+  button.primary[disabled]{
+    background:var(--navy-mid);
+    opacity:.75;
+    cursor:wait;
+  }
+  .spinner{
+    display:inline-block;
+    width:15px; height:15px;
+    border:2px solid rgba(255,255,255,.4);
+    border-top-color:#fff;
+    border-radius:50%;
+    animation:spin .7s linear infinite;
+    margin-inline-end:8px;
+    vertical-align:-2px;
+  }
+  @keyframes spin{ to{ transform:rotate(360deg); } }
+
+  .error-banner{
+    display:none;
+    background:#FBF3F1;
+    border:1px solid var(--danger);
+    color:var(--danger);
+    border-radius:10px;
+    padding:14px 16px;
+    font-size:14px;
+    font-weight:600;
+    margin-bottom:16px;
+  }
+  .error-banner.show{ display:block; }
+
+  .result-box{
+    white-space:pre-wrap;
+    font-size:15px;
+    line-height:1.7;
+    border:1px solid var(--line);
+    border-radius:10px;
+    padding:20px 22px;
+    margin-bottom:16px;
+    background:#FCFCFA;
+    min-height:200px;
+  }
+  .result-box:focus{
+    outline:none;
+    border-color:var(--olive);
+    box-shadow:0 0 0 3px rgba(107,122,79,0.18);
+  }
+
+  /* תצוגת קורות חיים מובנית בתוך result-box */
+  .result-box .r-name{
+    font-family:'Heebo',sans-serif;
+    font-size:24px;
+    font-weight:800;
+    color:var(--navy);
+    margin:0 0 4px;
+  }
+  .result-box .r-contact{
+    font-size:14px;
+    color:var(--text-muted);
+    margin:0 0 18px;
+  }
+  .result-box .r-section{
+    font-family:'Heebo',sans-serif;
+    font-size:15px;
+    font-weight:700;
+    color:var(--olive-dark);
+    border-bottom:1px solid var(--line);
+    padding-bottom:6px;
+    margin:20px 0 10px;
+  }
+  .result-box .r-para{ margin:0 0 8px; }
+  .result-box .r-list{
+    margin:0 0 8px;
+    padding:0;
+    list-style:none;
+  }
+  .result-box .r-list li{ margin:0 0 6px; }
+
+  .linkedin-box{
+    border-top:1px dashed var(--line);
+    padding-top:18px;
+    margin-top:6px;
+  }
+  .result-actions{
+    display:flex;
+    gap:12px;
+    margin-bottom:20px;
+  }
+  button.secondary{
+    flex:1;
+    font-family:'Assistant',sans-serif;
+    font-size:14.5px;
+    font-weight:600;
+    color:var(--navy);
+    background:#fff;
+    border:1px solid var(--line);
+    border-radius:9px;
+    padding:12px;
+    cursor:pointer;
+    transition:border-color .15s, background .15s;
+  }
+  button.secondary:hover{ border-color:var(--olive); background:#F7F8F4; }
+
+  #printHint{
+    text-align:center;
+    margin-top:-6px;
+    font-size:12.5px;
+    color:var(--text-muted);
+  }
+
+  .next-wrap{
+    text-align:center;
+    margin:8px 0 40px;
+  }
+  .next-wrap button{
+    max-width:280px;
+    margin:0 auto;
+  }
+
+  .credit{
+    text-align:center;
+    font-size:15px;
+    font-weight:700;
+    color:var(--navy);
+    letter-spacing:.06em;
+    padding:18px 0 24px;
+    border-top:1px solid var(--line);
+    margin-top:10px;
+  }
+
+  .gate{
+    position:fixed;
+    inset:0;
+    background:var(--paper);
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    z-index:100;
+    padding:20px;
+  }
+  .gate-box{
+    background:var(--paper-card);
+    border:1px solid var(--line);
+    border-radius:14px;
+    padding:32px 30px;
+    max-width:380px;
+    width:100%;
+  }
+  .gate-box .field{ margin-bottom:16px; }
+  .gate-box button{ width:100%; }
+
+  @media print{
+    .ribbon, .steps, form, header.page-head, .card-sub, .result-actions,
+    #tailorCard, .next-wrap, #printHint, .credit, .linkedin-box, .gate{ display:none !important; }
+    body{ background:#fff; }
+    #resultCard{ border:none; padding:0; }
+    .result-box{ border:none; padding:0; }
+
+    /* בהדפסת הגרסה המותאמת - מסתירים את הכרטיס הגנרי ומראים רק את כרטיס ההתאמה */
+    body.printing-tailored #resultCard{ display:none !important; }
+    body.printing-tailored #tailorCard{ display:block !important; }
+    body.printing-tailored #tailorCard .field, body.printing-tailored #tailorCard h2:first-of-type,
+    body.printing-tailored #tailorCard .card-sub, body.printing-tailored #tailorBtn,
+    body.printing-tailored #tailorError{ display:none !important; }
+    body.printing-tailored #tailorResultWrap{ display:block !important; margin-top:0 !important; }
+    body.printing-tailored .result-actions{ display:none !important; }
+  }
+
+
+  /* ===== 2026 wizard redesign ===== */
+  body{background:linear-gradient(180deg,#F4F5F1 0%,var(--paper) 100%);min-height:100vh;}
+  .wrap{max-width:1120px;margin:0 auto;padding:38px 28px 90px;margin-inline-end:auto;}
+  .ribbon{width:8px;opacity:.85;}
+  header.page-head{max-width:760px;margin:0 auto 26px;text-align:center;}
+  header.page-head .eyebrow{margin-inline:auto;}
+  h1{font-size:42px;line-height:1.15;}
+  .lede{margin-inline:auto;font-size:17px;}
+
+  .intro-screen{display:grid;grid-template-columns:minmax(0,1.25fr) minmax(300px,.75fr);gap:28px;align-items:stretch;margin-top:18px;}
+  .intro-hero,.intro-capabilities{background:#fff;border:1px solid var(--line);border-radius:22px;box-shadow:0 14px 45px rgba(22,35,58,.08);}
+  .intro-hero{padding:42px;display:flex;flex-direction:column;justify-content:center;min-height:390px;}
+  .intro-hero h2{font-family:'Heebo',sans-serif;color:var(--navy);font-size:30px;margin:0 0 12px;}
+  .intro-hero p{font-size:17px;color:var(--text-muted);margin:0 0 28px;max-width:58ch;}
+  .intro-capabilities{padding:24px;display:grid;gap:12px;align-content:center;}
+  .capability{border:1px solid #E5E7E1;border-radius:16px;padding:18px;background:#FBFCF9;}
+  .capability strong{display:block;color:var(--navy);font-size:16px;margin-bottom:4px;}
+  .capability span{color:var(--text-muted);font-size:14px;}
+  .intro-note{font-size:12.5px;color:var(--text-muted);margin-top:16px;}
+
+  .wizard-shell{display:none;max-width:1040px;margin:0 auto;}
+  .wizard-top{display:flex;align-items:center;gap:18px;margin:8px 0 22px;}
+  .wizard-counter{white-space:nowrap;font-size:14px;font-weight:700;color:var(--navy);}
+  .wizard-progress{height:8px;background:#E2E5DE;border-radius:999px;overflow:hidden;flex:1;}
+  .wizard-progress > span{display:block;height:100%;width:20%;background:linear-gradient(90deg,var(--olive),#87966A);border-radius:999px;transition:width .25s ease;}
+  .wizard-layout{display:grid;grid-template-columns:minmax(0,1fr) 280px;gap:24px;align-items:start;}
+  .wizard-main{min-width:0;}
+  .wizard-help{position:sticky;top:22px;background:#fff;border:1px solid var(--line);border-radius:18px;padding:20px;box-shadow:0 10px 30px rgba(22,35,58,.06);}
+  .wizard-help .help-kicker{font-size:12px;font-weight:700;color:var(--olive-dark);margin-bottom:6px;}
+  .wizard-help h3{font-size:17px;margin:0 0 8px;color:var(--navy);}
+  .wizard-help p{font-size:13.5px;color:var(--text-muted);margin:0;line-height:1.65;}
+
+  #cvForm > section.card{display:none;border-radius:20px;padding:30px 30px 12px;box-shadow:0 12px 36px rgba(22,35,58,.06);}
+  #cvForm > section.card.wizard-active{display:block;animation:wizardIn .22s ease;}
+  @keyframes wizardIn{from{opacity:.35;transform:translateY(5px)}to{opacity:1;transform:none}}
+  section.card h2{font-size:22px;font-weight:700;margin-bottom:5px;}
+  section.card .card-sub{font-size:14px;margin-bottom:24px;}
+  input[type="text"],input[type="email"],input[type="tel"],input[type="password"],textarea,select{font-size:16px;padding:13px 14px;border-radius:12px;background:#fff;}
+  textarea{min-height:96px;}
+  .field label{font-size:15px;margin-bottom:7px;}
+  .toggle-field{border-radius:14px;background:#FCFCFA;padding:16px 18px;transition:.15s;}
+  .toggle-field:has(input:checked){border-color:rgba(107,122,79,.7);background:#F6F8F1;box-shadow:0 0 0 2px rgba(107,122,79,.08);}
+
+  .wizard-nav{display:flex;gap:12px;justify-content:space-between;align-items:center;margin-top:18px;padding:18px 0 0;}
+  .wizard-nav button{min-height:50px;border-radius:12px;padding:0 24px;font-size:15px;font-weight:700;cursor:pointer;}
+  .wizard-nav .back{background:transparent;border:1px solid var(--line);color:var(--navy);}
+  .wizard-nav .forward{margin-inline-start:auto;background:var(--navy);color:#fff;border:none;min-width:190px;}
+  .wizard-nav .forward:hover{background:var(--navy-mid);}
+  .wizard-nav .back[disabled]{visibility:hidden;}
+
+  .review-card{display:none;background:#fff;border:1px solid var(--line);border-radius:20px;padding:30px;box-shadow:0 12px 36px rgba(22,35,58,.06);}
+  .review-card.wizard-active{display:block;}
+  .review-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin:20px 0;}
+  .review-item{border:1px solid #E4E6E0;background:#FBFCF9;border-radius:14px;padding:16px;}
+  .review-item h3{font-size:14px;color:var(--olive-dark);margin:0 0 7px;}
+  .review-item p{font-size:14px;white-space:pre-line;margin:0;color:var(--text);}
+  .privacy-check{display:flex;gap:10px;align-items:flex-start;border-radius:14px;background:#F6F8F1;padding:14px 16px;margin:18px 0;}
+  .privacy-check input{width:18px;height:18px;margin-top:2px;accent-color:var(--olive);}
+
+  .actions{position:static;background:none;padding:0;margin:0;display:none;}
+  .actions.show-submit{display:block;}
+
+  #resultCard,#tailorCard{max-width:1040px;margin:26px auto;border-radius:22px;padding:28px;box-shadow:0 16px 48px rgba(22,35,58,.08);}
+  #resultCard .result-box,#tailorResultBox{background:#fff;border:1px solid #E0E2DC;box-shadow:0 8px 28px rgba(22,35,58,.07);padding:42px 48px;border-radius:4px;min-height:520px;}
+  .result-actions{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;}
+  .result-actions button{min-height:48px;}
+  .result-next-actions{display:grid;grid-template-columns:1fr 1fr;gap:12px;border-top:1px solid var(--line);padding-top:20px;margin-top:20px;}
+  .result-next-actions button{min-height:52px;}
+  .result-next-actions .featured{background:var(--olive-dark);color:#fff;border-color:var(--olive-dark);}
+  .linkedin-box{border:1px solid var(--line);border-radius:14px;padding:16px;margin-top:18px;background:#FBFCF9;}
+  #tailorCard{display:none;}
+  .next-wrap{margin-top:28px;}
+
+  .review-note{margin:14px 0 0;padding:11px 13px;border-radius:12px;background:#F7F8F4;color:var(--text-muted);font-size:13px;}
+
+  .generation-overlay{
+    position:fixed;inset:0;z-index:200;display:none;align-items:center;justify-content:center;
+    padding:20px;background:rgba(22,35,58,.28);backdrop-filter:blur(5px);
+  }
+  .generation-overlay.show{display:flex;}
+  .generation-card{
+    width:min(460px,100%);background:#fff;border:1px solid rgba(255,255,255,.8);border-radius:24px;
+    padding:34px 30px;text-align:center;box-shadow:0 24px 80px rgba(22,35,58,.22);
+  }
+  .generation-card h2{font-family:'Heebo',sans-serif;color:var(--navy);font-size:24px;margin:16px 0 8px;}
+  .generation-card p{margin:0 0 18px;color:var(--text-muted);font-size:15px;min-height:24px;}
+  .generation-card small{display:block;margin-top:14px;color:var(--text-muted);font-size:12.5px;}
+  .generation-spinner{
+    width:52px;height:52px;margin:0 auto;border-radius:50%;border:5px solid #E8EBE3;border-top-color:var(--olive);
+    animation:spin .8s linear infinite;
+  }
+  .generation-progress{height:7px;background:#E7E9E3;border-radius:999px;overflow:hidden;}
+  .generation-progress span{display:block;height:100%;width:38%;border-radius:999px;background:linear-gradient(90deg,var(--olive),#9AAA79);animation:genProgress 1.35s ease-in-out infinite;}
+  @keyframes genProgress{0%{transform:translateX(170%)}50%{transform:translateX(25%)}100%{transform:translateX(-170%)}}
+
+  /* result action center */
+  body{background:
+    radial-gradient(circle at 88% 8%, rgba(107,122,79,.10), transparent 28%),
+    radial-gradient(circle at 10% 90%, rgba(44,64,88,.08), transparent 32%),
+    var(--paper);}
+  #resultCard{background:linear-gradient(180deg,#FFFFFF 0%,#FBFCF9 100%);border:1px solid #DADDD3;}
+  .result-ready{
+    display:flex;align-items:center;gap:10px;margin:0 0 18px;padding:13px 16px;
+    border-radius:14px;background:#EEF5E8;border:1px solid #D4E2C8;color:#425231;font-weight:700;
+  }
+  .result-ready .check{display:inline-grid;place-items:center;width:25px;height:25px;border-radius:50%;background:var(--olive);color:#fff;font-size:14px;}
+  .result-actions{margin-top:16px;}
+  .result-actions .result-primary{background:var(--navy);border-color:var(--navy);color:#fff;font-weight:700;}
+  .result-actions .result-primary:hover{background:var(--navy-mid);}
+  .next-actions-title{margin:24px 0 10px;padding-top:20px;border-top:1px solid var(--line);}
+  .next-actions-title h3{margin:0 0 4px;color:var(--navy);font-size:18px;}
+  .next-actions-title p{margin:0;color:var(--text-muted);font-size:13.5px;}
+  .result-next-actions{border-top:none;padding-top:0;margin-top:12px;}
+  .action-card{
+    min-height:82px!important;text-align:right!important;padding:15px 18px!important;border-radius:16px!important;
+    display:flex!important;flex-direction:column;align-items:flex-start;justify-content:center;gap:3px;
+  }
+  .action-card strong{font-size:16px;line-height:1.2;}
+  .action-card span{font-size:12.5px;font-weight:500;opacity:.82;line-height:1.45;}
+  .action-card.tailor-action{background:#657548!important;border-color:#657548!important;color:#fff!important;}
+  .action-card.tailor-action:hover{background:#58683E!important;}
+  .action-card.linkedin-action{background:#F0F5FA!important;border-color:#C9D9E8!important;color:#183A5A!important;}
+  .action-card.linkedin-action:hover{background:#E6F0F8!important;border-color:#AFC7DC!important;}
+  .linkedin-box{
+    border-color:#C9D9E8;background:linear-gradient(180deg,#F7FBFF 0%,#EEF6FC 100%);
+    padding:20px;border-radius:18px;
+  }
+  .linkedin-head{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:12px;}
+  .linkedin-head h3{margin:0;color:#183A5A;font-size:18px;}
+  .linkedin-status{margin:0;color:var(--text-muted);font-size:13.5px;}
+  .linkedin-loading{display:flex;align-items:center;gap:10px;padding:18px 0;color:#35536E;font-weight:600;}
+  .linkedin-loading .mini-spinner{width:20px;height:20px;border:3px solid #D6E5F1;border-top-color:#4B7596;border-radius:50%;animation:spin .7s linear infinite;}
+  #tailorCard{
+    background:linear-gradient(180deg,#FBFDF8 0%,#F3F7EC 100%);border:1px solid #D4DDC8;
+  }
+  #tailorCard h2:first-child{color:#4D5E38;}
+  #tailorCard textarea{background:#fff;}
+  .panel-close{background:transparent;border:none;color:var(--text-muted);font-family:'Assistant',sans-serif;cursor:pointer;font-size:13px;padding:5px 0;}
+  .panel-close:hover{color:var(--navy);}
+
+  .mobile-only{display:none;}
+
+  @media (max-width:800px){
+    .wrap{padding:24px 16px 72px;}
+    header.page-head{text-align:right;margin-bottom:18px;}
+    header.page-head .eyebrow{margin-inline:0;}
+    h1{font-size:32px;}
+    .lede{font-size:15px;margin-inline:0;}
+    .intro-screen{grid-template-columns:1fr;gap:14px;}
+    .intro-hero{padding:26px 22px;min-height:auto;}
+    .intro-hero h2{font-size:25px;}
+    .intro-capabilities{padding:14px;grid-template-columns:1fr;}
+    .wizard-layout{grid-template-columns:1fr;}
+    .wizard-help{display:none;}
+    .wizard-top{gap:12px;margin-top:0;}
+    .wizard-counter{font-size:13px;}
+    #cvForm > section.card,.review-card{padding:22px 18px 8px;border-radius:17px;}
+    .row2{grid-template-columns:1fr;gap:0;}
+    .review-grid{grid-template-columns:1fr;}
+    .wizard-nav{position:sticky;bottom:0;z-index:8;background:linear-gradient(to top,var(--paper) 75%,rgba(238,240,234,0));padding:20px 0 12px;flex-direction:column;}
+    .wizard-nav .forward,.wizard-nav .back{width:100%;margin:0;}
+    .wizard-nav .forward{order:1;}
+    .wizard-nav .back{order:2;background:#fff;}
+    #resultCard,#tailorCard{padding:18px 14px;margin:18px 0;border-radius:18px;}
+    #resultCard .result-box,#tailorResultBox{padding:24px 18px;min-height:360px;border-radius:10px;}
+    .result-actions{grid-template-columns:1fr;}
+    .result-next-actions{grid-template-columns:1fr;}
+    .mobile-only{display:block;}
+    .ribbon{display:none;}
+  }
+
+</style>
+</head>
+<body>
+
+<div class="gate" id="gate">
+  <div class="gate-box">
+    <span class="eyebrow">כלי ליצירת קורות חיים לפורשי צה"ל</span>
+    <h1 style="font-size:24px;">כניסה</h1>
+    <p class="lede" style="margin-bottom:20px;">הכלי מיועד למשתתפי התוכנית בלבד. הזינו את הסיסמה שקיבלתם.</p>
+    <div class="field">
+      <label for="gatePassword">סיסמה</label>
+      <input type="password" id="gatePassword" autocomplete="off">
+      <p class="error-msg" id="gateError" style="display:none;">סיסמה שגויה, נסה/י שוב</p>
+    </div>
+    <button type="button" class="primary" id="gateBtn">כניסה</button>
+  </div>
+</div>
+
+<div class="ribbon"><span></span><span></span><span></span><span></span><span></span></div>
+
+<div class="wrap" id="mainWrap" style="display:none;">
+  <header class="page-head">
+    <span class="eyebrow">כלי ליצירת קורות חיים לפורשי צה"ל</span>
+    <h1>מהמדים לקורות חיים</h1>
+    <p class="lede">ספרו לנו מה עשיתם בצבא. אנחנו נעזור לתרגם את הניסיון שלכם לשפה אזרחית ולבנות ממנו קורות חיים מקצועיים.</p>
+  </header>
+
+  <section class="intro-screen" id="introScreen">
+    <div class="intro-hero">
+      <span class="eyebrow">מתחילים מהניסיון שלך</span>
+      <h2>כמה שאלות קצרות, וקורות החיים מתחילים לקבל צורה</h2>
+      <p>אין צורך לדעת איך לנסח קורות חיים. כתבו בפשטות על התפקידים, האחריות וההישגים שלכם, והמערכת תתרגם אותם לניסוח אזרחי מקצועי.</p>
+      <button type="button" class="primary" id="startWizardBtn">מתחילים</button>
+      <div class="intro-note">אין להזין מידע מסווג או רגיש. הנתונים משמשים לצורך יצירת התוצר בלבד.</div>
+    </div>
+    <div class="intro-capabilities">
+      <div class="capability"><strong>קורות חיים מקצועיים</strong><span>תרגום הניסיון הצבאי לשפה שמעסיקים אזרחיים מבינים.</span></div>
+      <div class="capability"><strong>התאמה למשרה</strong><span>אחרי יצירת הגרסה הבסיסית ניתן להתאים אותה למודעת דרושים ספציפית.</span></div>
+      <div class="capability"><strong>LinkedIn והכנה לראיון</strong><span>יצירת Bio מקצועי והכנה לשאלות על בסיס דרישות המשרה.</span></div>
+    </div>
+  </section>
+
+  <div class="wizard-shell" id="wizardShell">
+    <div class="wizard-top">
+      <div class="wizard-counter" id="wizardCounter">שלב 1 מתוך 5</div>
+      <div class="wizard-progress"><span id="wizardProgressBar"></span></div>
+    </div>
+    <div class="wizard-layout">
+      <div class="wizard-main">
+
+  <button type="button" class="secondary" id="demoFillBtn" style="display:none; margin-bottom:20px;">מלא נתוני דוגמה (מצב בדיקה)</button>
+
+  <form id="cvForm">
+
+    <section class="card">
+      <h2>פרטים אישיים</h2>
+      <p class="card-sub">יופיעו בראש קורות החיים</p>
+
+      <div class="field">
+        <label for="fullName">שם מלא <span class="required-mark">*</span></label>
+        <input type="text" id="fullName" required>
+        <p class="error-msg" id="fullNameError">יש להזין אותיות בלבד (עברית או אנגלית)</p>
+      </div>
+
+      <div class="row2">
+        <div class="field">
+          <label for="phone">טלפון <span class="required-mark">*</span></label>
+          <input type="tel" id="phone" required placeholder="050-1234567">
+          <p class="error-msg" id="phoneError">מספר טלפון לא תקין - יש להזין 9 או 10 ספרות</p>
+        </div>
+        <div class="field">
+          <label for="email">אימייל <span class="required-mark">*</span></label>
+          <input type="email" id="email" required placeholder="name@example.com">
+          <p class="error-msg" id="emailError">כתובת אימייל לא תקינה</p>
+        </div>
+      </div>
+    </section>
+
+    <section class="card">
+      <h2>השירות הצבאי</h2>
+      <p class="card-sub">הבסיס לתרגום התפקיד שלכם לשפה אזרחית</p>
+
+      <div class="row2">
+        <div class="field">
+          <label for="rank">דרגה סופית <span class="required-mark">*</span></label>
+          <input type="text" id="rank" required placeholder="לדוגמה: רס״ן">
+          <p class="error-msg" id="rankError">שדה חובה</p>
+        </div>
+        <div class="field">
+          <label for="years">שנות שירות <span class="required-mark">*</span></label>
+          <input type="text" id="years" required placeholder="לדוגמה: 2004–2024">
+          <p class="error-msg" id="yearsError">שדה חובה</p>
+        </div>
+      </div>
+
+      <div class="field">
+        <label for="role">תפקיד אחרון / עיקרי <span class="required-mark">*</span></label>
+        <textarea id="role" required placeholder="לדוגמה: קצין לוגיסטיקה בגדוד, אחראי על אספקה ותחזוקה"></textarea>
+        <p class="error-msg" id="roleError">שדה חובה</p>
+      </div>
+
+      <div class="row2 role-period-row">
+        <div class="field">
+          <label for="roleFrom">משנת</label>
+          <input type="text" id="roleFrom" inputmode="numeric" placeholder="לדוגמה: 2020">
+        </div>
+        <div class="field">
+          <label for="roleTo">עד שנת</label>
+          <input type="text" id="roleTo" inputmode="numeric" placeholder="לדוגמה: 2026">
+        </div>
+      </div>
+      <p class="hint role-period-hint">לא חובה אם זה התפקיד היחיד. מומלץ למלא אם מוסיפים תפקידים נוספים.</p>
+
+      <div class="additional-roles-wrap">
+        <div class="additional-roles-head">
+          <div>
+            <strong>תפקידים מרכזיים נוספים לאורך השירות</strong>
+            <p class="hint">אפשר להוסיף כל תפקיד בנפרד, כולל השנים שבהן ביצעתם אותו.</p>
+          </div>
+          <button type="button" class="secondary add-role-btn" id="addRoleBtn">+ הוסף תפקיד נוסף</button>
+        </div>
+        <div id="additionalRoles"></div>
+      </div>
+    </section>
+
+    <section class="card">
+      <h2>ניהול ואחריות</h2>
+      <p class="card-sub">זה מה שהופך לרוב לניסוח החזק ביותר בקורות חיים אזרחיים</p>
+
+      <div class="toggle-field">
+        <label class="toggle-head">
+          <input type="checkbox" class="toggle-trigger" data-target="peopleDetail">
+          <span class="label">ניהלתי / פיקדתי על אנשים</span>
+        </label>
+        <div class="toggle-detail" id="peopleDetail">
+          <textarea placeholder="כמה אנשים? באיזו מסגרת? (לדוגמה: פיקוד על 45 חיילים בשלושה צוותים)"></textarea>
+        </div>
+      </div>
+
+      <div class="toggle-field">
+        <label class="toggle-head">
+          <input type="checkbox" class="toggle-trigger" data-target="budgetDetail">
+          <span class="label">ניהלתי תקציב, ציוד או רכש</span>
+        </label>
+        <div class="toggle-detail" id="budgetDetail">
+          <textarea placeholder="היקף התקציב/הציוד, ולמה הייתם אחראים"></textarea>
+        </div>
+      </div>
+
+      <div class="toggle-field">
+        <label class="toggle-head">
+          <input type="checkbox" class="toggle-trigger" data-target="trainingDetail">
+          <span class="label">הדרכתי, בניתי תוכנית הכשרה או העברתי קורסים</span>
+        </label>
+        <div class="toggle-detail" id="trainingDetail">
+          <textarea placeholder="למי הדרכתם, ובאיזה נושא"></textarea>
+        </div>
+      </div>
+
+      <div class="field">
+        <label for="achievements">הישג או פרויקט שאתם הכי גאים בו</label>
+        <textarea id="achievements" placeholder="לדוגמה: הובלתי מעבר למערכת מלאי דיגיטלית שקיצרה זמני אספקה ב-30%"></textarea>
+        <p class="hint">תוצאה מדידה (זמן, כסף, איכות) עוזרת מאוד - אבל לא חובה</p>
+      </div>
+    </section>
+
+    <section class="card">
+      <h2>כישורים והשכלה</h2>
+
+      <div class="field">
+        <label for="skills">כישורים טכניים ומקצועיים</label>
+        <textarea id="skills" placeholder="מערכות, תוכנות, כלים - לדוגמה: Excel, ניהול פרויקטים, מערכות מידע צבאיות"></textarea>
+      </div>
+
+      <div class="field">
+        <label for="education">השכלה אזרחית</label>
+        <textarea id="education" placeholder="תואר, לימודים - כולל אם עדיין בתהליך"></textarea>
+      </div>
+
+      <div class="field">
+        <label for="courses">קורסים והכשרות צבאיים בעלי ערך אזרחי</label>
+        <textarea id="courses" placeholder="קורס קצינים, קורס ניהול, הכשרות טכניות וכו׳"></textarea>
+      </div>
+
+      <div class="field">
+        <label for="languages">שפות נוספות</label>
+        <input type="text" id="languages" placeholder="לדוגמה: אנגלית - שוטפת, ערבית - בסיסית">
+      </div>
+    </section>
+
+    <section class="review-card" id="reviewCard">
+      <h2>כמעט סיימנו</h2>
+      <p class="card-sub">עברו על הפרטים לפני יצירת קורות החיים. אם משהו חסר, אפשר לחזור ולתקן.</p>
+      <p class="review-note">תזכורת: אין להזין מידע מסווג או רגיש.</p>
+      <div class="review-grid" id="reviewGrid"></div>
+    </section>
+
+    <div class="wizard-nav" id="wizardNav">
+      <button type="button" class="back" id="wizardBackBtn">הקודם</button>
+      <button type="button" class="forward" id="wizardNextBtn">המשך</button>
+    </div>
+
+    <div class="actions" id="generateActions">
+      <p class="error-banner" id="apiError">אירעה שגיאה ביצירת קורות החיים. בדוק/י את החיבור לאינטרנט ונסה/י שוב.</p>
+      <button type="submit" class="primary" id="submitBtn">צור קורות חיים גנריים</button>
+      <p class="note" id="submitNote">הפקת קורות החיים עשויה לקחת עד כ-30 שניות</p>
+    </div>
+
+  </form>
+      </div>
+      <aside class="wizard-help" id="wizardHelp">
+        <div class="help-kicker">טיפ לשלב הזה</div>
+        <h3 id="wizardHelpTitle">כתבו פשוט</h3>
+        <p id="wizardHelpText">אין צורך לנסח כמו בקורות חיים. כתבו את העובדות, והמערכת תעזור בניסוח המקצועי.</p>
+      </aside>
+    </div>
+  </div>
+
+  <section class="card" id="resultCard" style="display:none;">
+    <div class="result-ready"><span class="check">✓</span><span>קורות החיים מוכנים</span></div>
+    <h2>קורות החיים שלך</h2>
+    <p class="card-sub">זו טיוטת בסיס - חשוב לעבור עליה ולערוך ישירות בתוך הטקסט לפני הורדה או שליחה</p>
+    <div id="resultBox" class="result-box" contenteditable="true"></div>
+    <div class="result-actions">
+      <button type="button" class="secondary" id="copyBtn">העתק טקסט</button>
+      <button type="button" class="secondary result-primary" id="wordBtn">הורד כקובץ Word</button>
+      <button type="button" class="secondary" id="printBtn">שמור כ-PDF / הדפס</button>
+    </div>
+    <p class="hint" id="printHint">אם ההדפסה לא מציעה "שמור כ-PDF" - מומלץ להשתמש בכפתור "הורד כקובץ Word" למעלה, זה עובד תמיד</p>
+
+    <div class="next-actions-title">
+      <h3>מה תרצה לעשות עכשיו?</h3>
+      <p>אפשר להתאים את קורות החיים למשרה מסוימת, או ליצור Bio מקצועי ל-LinkedIn.</p>
+    </div>
+    <div class="result-next-actions">
+      <button type="button" class="secondary action-card tailor-action" id="openTailorBtn"><strong>התאם למשרה</strong><span>הדבק מודעת דרושים או תאר תפקיד רצוי</span></button>
+      <button type="button" class="secondary action-card linkedin-action" id="openLinkedinBtn"><strong>צור Bio ל-LinkedIn</strong><span>תקציר מקצועי על בסיס קורות החיים</span></button>
+    </div>
+
+    <div class="linkedin-box" id="linkedinBox" style="display:none;">
+      <div class="linkedin-head">
+        <h3>Bio ל-LinkedIn</h3>
+        <button type="button" class="panel-close" id="closeLinkedinBtn">סגור</button>
+      </div>
+      <p class="linkedin-status" id="linkedinStatus">יוצרים תקציר מקצועי על בסיס קורות החיים...</p>
+      <div class="linkedin-loading" id="linkedinLoading"><span class="mini-spinner"></span><span>יוצר Bio...</span></div>
+      <p class="error-banner" id="linkedinError">אירעה שגיאה ביצירת התקציר. נסה/י שוב.</p>
+      <div id="linkedinResultWrap" style="display:none; margin-top:16px;">
+        <div id="linkedinResultBox" class="result-box" contenteditable="true" style="white-space:pre-wrap;min-height:180px;"></div>
+        <div class="result-actions" style="grid-template-columns:1fr;">
+          <button type="button" class="secondary" id="copyLinkedinBtn">העתק Bio</button>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section class="card" id="tailorCard" style="display:none;">
+    <button type="button" class="panel-close" id="closeTailorBtn">סגור התאמה למשרה</button>
+    <h2>התאמה למשרה או תפקיד</h2>
+    <p class="card-sub">הדביקו מודעת דרושים, או תארו את התפקיד שאתם מחפשים - וקורות החיים יותאמו ויודגשו בהתאם. הגרסה הגנרית למעלה תישאר כמו שהיא.</p>
+    <div class="field">
+      <label for="targetJob">משרה או תפקיד רצוי</label>
+      <textarea id="targetJob" placeholder="הדביקו כאן מודעת דרושים, או תארו את סוג התפקיד שאתם מחפשים"></textarea>
+    </div>
+    <p class="error-banner" id="tailorError">אירעה שגיאה בהתאמת קורות החיים. נסה/י שוב.</p>
+    <button type="button" class="primary" id="tailorBtn">התאם קורות חיים למשרה</button>
+    <div id="tailorResultWrap" style="display:none; margin-top:22px;">
+      <h2>קורות החיים המותאמים</h2>
+      <div id="tailorResultBox" class="result-box" contenteditable="true"></div>
+      <div class="result-actions">
+        <button type="button" class="secondary" id="copyTailorBtn">העתק טקסט</button>
+        <button type="button" class="secondary" id="wordTailorBtn">הורד כקובץ Word</button>
+        <button type="button" class="secondary" id="printTailorBtn">שמור כ-PDF / הדפס</button>
+      </div>
+
+      <div class="linkedin-box">
+        <p class="card-sub" style="margin:0 0 12px;">רוצה להתכונן לראיון על סמך ההתאמה הזו?</p>
+        <button type="button" class="secondary" id="interviewBtn">הכן אותי לראיון</button>
+        <p class="error-banner" id="interviewError">אירעה שגיאה בהכנת שאלות הראיון. נסה/י שוב.</p>
+        <div id="interviewResultWrap" style="display:none; margin-top:16px;">
+          <div id="interviewResultBox" class="result-box" contenteditable="true" style="white-space:pre-wrap;"></div>
+          <div class="result-actions">
+            <button type="button" class="secondary" id="copyInterviewBtn">העתק טקסט</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <footer class="credit">VAN DAM מערכות</footer>
+</div>
+
+<div class="generation-overlay" id="generationOverlay" aria-live="polite" aria-busy="true">
+  <div class="generation-card">
+    <div class="generation-spinner" aria-hidden="true"></div>
+    <h2 id="generationTitle">אנחנו בונים את קורות החיים שלך</h2>
+    <p id="generationStatus">מנתחים את הניסיון שמילאת...</p>
+    <div class="generation-progress"><span></span></div>
+    <small id="generationNote">זה עשוי לקחת עד כחצי דקה. אין צורך ללחוץ שוב.</small>
+  </div>
+</div>
+
+<script>
+  // ===== מסך כניסה (סיסמה) =====
+  let appPassword = sessionStorage.getItem('appPassword') || '';
+
+  function showMain(){
+    document.getElementById('gate').style.display = 'none';
+    document.getElementById('mainWrap').style.display = '';
+  }
+
+  async function checkPassword(pw){
+    const response = await fetch('/api/verify', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ password: pw })
+    });
+    const result = await response.json();
+    return response.ok && result.ok;
+  }
+
+  document.getElementById('gateBtn').addEventListener('click', async ()=>{
+    const pw = document.getElementById('gatePassword').value;
+    const btn = document.getElementById('gateBtn');
+    const err = document.getElementById('gateError');
+    err.style.display = 'none';
+    btn.disabled = true;
+    btn.textContent = 'בודק...';
+
+    try {
+      const ok = await checkPassword(pw);
+      if (ok) {
+        appPassword = pw;
+        sessionStorage.setItem('appPassword', pw);
+        showMain();
       } else {
-        current.paragraphs.push(line);
+        err.style.display = 'block';
       }
+    } catch (e) {
+      err.textContent = 'שגיאת תקשורת, נסה/י שוב';
+      err.style.display = 'block';
+    } finally {
+      btn.disabled = false;
+      btn.textContent = 'כניסה';
+    }
+  });
+
+  document.getElementById('gatePassword').addEventListener('keydown', (e)=>{
+    if (e.key === 'Enter') document.getElementById('gateBtn').click();
+  });
+
+  // אם כבר אומתה סיסמה בטאב הזה - מדלגים ישר לתוכן, בלי לבזבז קריאה נוספת
+  if (appPassword) {
+    showMain();
+  }
+
+  // ===== מצב בדיקה (?demo=1) - מילוי אוטומטי לצורך בדיקות בלבד =====
+  const DEMO_PROFILES = [
+    {
+      fullName: 'ישראל ישראלי', phone: '0501234567', email: 'israel@example.com',
+      rank: 'רס"ן', years: '2002–2023', role: 'קצין אחזקה, חטיבת אש - צה"ל',
+      rolesHistory: 'מפקד פלוגת תחזוקה (2008-2012), קצין רכש ביחידה (2012-2016)',
+      managedPeople: 'ניהול ישיר של כ-45 חיילים וקצינים זוטרים',
+      managedBudget: 'ניהול תקציב תחזוקה שנתי של כ-8 מיליון ש"ח',
+      training: 'בניתי ומסרתי תוכנית הכשרה לטכנאי תחזוקה חדשים',
+      achievements: 'הובלתי מעבר למערכת ניהול מלאי דיגיטלית שקיצרה זמני תיקון ב-30%',
+      skills: 'Excel, ניהול פרויקטים, מערכות ERP צבאיות, SAP',
+      education: 'תואר ראשון בהנדסת תעשייה וניהול, האוניברסיטה הפתוחה (בהשלמה)',
+      courses: 'קורס קצינים, קורס ניהול משאבים, הכשרת בטיחות בעבודה',
+      languages: 'אנגלית - שוטפת'
+    },
+    {
+      fullName: 'דנה כהן', phone: '0529876543', email: 'dana.c@example.com',
+      rank: 'רס"ר', years: '2005–2025', role: 'מפקדת מערך גרירה וחילוץ',
+      rolesHistory: 'מפקדת כיתת חילוץ (2010-2015), רכזת הדרכה למערך (2015-2020)',
+      managedPeople: 'פיקוד על 25 חיילים בשלושה צוותי חילוץ',
+      managedBudget: '',
+      training: 'הדרכתי צוותי חילוץ חדשים בתרחישי חירום ותאונות דרכים',
+      achievements: 'תיאמתי מבצע חילוץ מורכב בתנאי שטח קשים שהוביל להצלת נפגעים ללא אבדות נוספות',
+      skills: 'ניהול צוותים בשטח, תיאום מבצעי חירום, עזרה ראשונה מתקדמת',
+      education: '',
+      courses: 'קורס מש"קיות חילוץ, הכשרת חובשים',
+      languages: 'ערבית - בסיסית'
+    },
+    {
+      fullName: 'אבי לוי', phone: '0541112233', email: 'avi.levi@example.com',
+      rank: 'סא"ל', years: '1999–2024', role: 'ראש ענף מבצעים במטה חטיבתי',
+      rolesHistory: '',
+      managedPeople: 'ניהול מטה של 12 קצינים ונגדים',
+      managedBudget: 'ניהול תקציב מבצעי רב-שנתי',
+      training: '',
+      achievements: '',
+      skills: 'תכנון אסטרטגי, ניתוח מודיעיני, PowerPoint, ניהול ישיבות בכירים',
+      education: 'תואר שני במנהל עסקים (בעיצומו)',
+      courses: 'פיקוד ומטה, קורס מנהלים בכירים',
+      languages: 'אנגלית - שוטפת, צרפתית - בסיסית'
+    }
+  ];
+
+  const demoBtn = document.getElementById('demoFillBtn');
+  if (new URLSearchParams(window.location.search).get('demo') === '1') {
+    demoBtn.style.display = '';
+  }
+  demoBtn.addEventListener('click', ()=>{
+    const profile = DEMO_PROFILES[Math.floor(Math.random() * DEMO_PROFILES.length)];
+    const specialKeys = ['managedPeople', 'managedBudget', 'training'];
+    Object.keys(profile).forEach(key => {
+      if (specialKeys.includes(key)) return;
+      const el = document.getElementById(key);
+      if (el) el.value = profile[key];
+    });
+    // שדות שיושבים בתוך תיבת "פירוט" (checkbox + textarea) - ממלאים ומסמנים בנפרד
+    [['peopleDetail','managedPeople'], ['budgetDetail','managedBudget'], ['trainingDetail','training']].forEach(([targetId, key])=>{
+      const cb = document.querySelector(`.toggle-trigger[data-target="${targetId}"]`);
+      const has = !!profile[key];
+      cb.checked = has;
+      document.getElementById(targetId).classList.toggle('open', has);
+      const textarea = document.querySelector(`#${targetId} textarea`);
+      if (textarea) textarea.value = profile[key] || '';
+    });
+    document.querySelectorAll('.field.invalid').forEach(f => f.classList.remove('invalid'));
+  });
+
+  document.querySelectorAll('.toggle-trigger').forEach(cb=>{
+    cb.addEventListener('change', ()=>{
+      const target = document.getElementById(cb.dataset.target);
+      target.classList.toggle('open', cb.checked);
+    });
+  });
+
+
+  // ===== אשף רב-שלבי =====
+  const wizardSections = Array.from(document.querySelectorAll('#cvForm > section.card'));
+  const reviewCard = document.getElementById('reviewCard');
+  const wizardPanels = [...wizardSections, reviewCard];
+  const wizardHelpContent = [
+    ['הפרטים שיופיעו בראש המסמך','בדקו שהטלפון והאימייל מעודכנים. אין צורך להוסיף כתובת מלאה או פרטים אישיים שאינם נדרשים.'],
+    ['ספרו על מסלול השירות','השאירו את שנות השירות הכוללות, ואם היו כמה תפקידים משמעותיים הוסיפו כל אחד בנפרד עם התקופה שלו.'],
+    ['חפשו אחריות ותוצאה','ניהול אנשים, תקציב, ציוד, הדרכה או הובלת שינוי הם חומר מצוין לקורות חיים. תוצאה מדידה עוזרת, אבל אינה חובה.'],
+    ['הוסיפו רק מה שרלוונטי','מערכות, תוכנות, תארים, קורסים ושפות יכולים לחזק את התמונה המקצועית. אין צורך למלא שדה שאין בו ערך.'],
+    ['בדיקה אחרונה','עברו על הסיכום וודאו שהפרטים נכונים. אחר כך ניצור את טיוטת קורות החיים.']
+  ];
+  let wizardStep = 0;
+
+  function setWizardStep(step){
+    wizardStep = Math.max(0, Math.min(wizardPanels.length - 1, step));
+    wizardPanels.forEach((p,i)=>p.classList.toggle('wizard-active', i === wizardStep));
+    const n = wizardStep + 1;
+    document.getElementById('wizardCounter').textContent = `שלב ${n} מתוך ${wizardPanels.length}`;
+    document.getElementById('wizardProgressBar').style.width = `${(n / wizardPanels.length) * 100}%`;
+    const [title,text] = wizardHelpContent[wizardStep];
+    document.getElementById('wizardHelpTitle').textContent = title;
+    document.getElementById('wizardHelpText').textContent = text;
+    const back = document.getElementById('wizardBackBtn');
+    const next = document.getElementById('wizardNextBtn');
+    back.disabled = wizardStep === 0;
+    next.textContent = wizardStep === wizardPanels.length - 1 ? 'צור את קורות החיים שלי' : 'המשך';
+    document.getElementById('generateActions').classList.toggle('show-submit', false);
+    if (wizardStep === wizardPanels.length - 1) buildReview();
+    window.scrollTo({top: document.getElementById('wizardShell').offsetTop - 20, behavior:'smooth'});
+  }
+
+  function validateWizardStep(step){
+    const requiredByStep = [
+      ['fullName','phone','email'],
+      ['rank','years','role'],
+      [],
+      []
+    ];
+    const ids = requiredByStep[step] || [];
+    for (const id of ids){
+      if (!validateField(id)){
+        document.getElementById(id).focus();
+        return false;
+      }
+    }
+
+    // אם נוספו תפקידים נוספים, השנים של כל תחנה הופכות לחיוניות
+    if (step === 1 && document.querySelectorAll('.additional-role-card').length){
+      const mainPeriodFields = [document.getElementById('roleFrom'), document.getElementById('roleTo')];
+      for (const field of mainPeriodFields){
+        if (!field.value.trim()){
+          field.setCustomValidity('כאשר מוסיפים תפקידים נוספים, יש לציין גם את תקופת התפקיד האחרון.');
+          field.reportValidity();
+          field.focus();
+          field.addEventListener('input', ()=>field.setCustomValidity(''), { once:true });
+          return false;
+        }
+      }
+      const cards = Array.from(document.querySelectorAll('.additional-role-card'));
+      for (const card of cards){
+        const required = [
+          card.querySelector('.additional-role-name'),
+          card.querySelector('.additional-role-from'),
+          card.querySelector('.additional-role-to')
+        ];
+        for (const field of required){
+          if (!field.value.trim()){
+            field.setCustomValidity('יש למלא שם תפקיד ומשנת התחלה וסיום.');
+            field.reportValidity();
+            field.focus();
+            field.addEventListener('input', ()=>field.setCustomValidity(''), { once:true });
+            return false;
+          }
+        }
+      }
+    }
+    return true;
+  }
+
+  function buildReview(){
+    const d = collectData();
+    const esc = (x)=>escapeHtml(x || 'לא צוין');
+    const management = [d.managedPeople && `ניהול אנשים: ${d.managedPeople}`, d.managedBudget && `תקציב/ציוד: ${d.managedBudget}`, d.training && `הדרכה: ${d.training}`, d.achievements && `הישג: ${d.achievements}`].filter(Boolean).join('\n') || 'לא צוין';
+    const mainRolePeriod = [d.roleFrom, d.roleTo].filter(Boolean).join('–');
+    const additional = (d.additionalRoles || []).map(r => {
+      const period = [r.from, r.to].filter(Boolean).join('–');
+      return [r.name, period && `(${period})`].filter(Boolean).join(' ');
+    }).filter(Boolean);
+    const serviceSummary = [
+      `${d.rank} | ${d.years}`,
+      [d.role, mainRolePeriod && `(${mainRolePeriod})`].filter(Boolean).join(' '),
+      ...additional
+    ].filter(Boolean).join('\n');
+    document.getElementById('reviewGrid').innerHTML = `
+      <div class="review-item"><h3>פרטים אישיים</h3><p>${esc(d.fullName)}\n${esc(d.phone)}\n${esc(d.email)}</p></div>
+      <div class="review-item"><h3>שירות</h3><p>${esc(serviceSummary)}</p></div>
+      <div class="review-item"><h3>ניהול והישגים</h3><p>${esc(management)}</p></div>
+      <div class="review-item"><h3>כישורים והשכלה</h3><p>${esc([d.skills,d.education,d.courses,d.languages].filter(Boolean).join('\n') || 'לא צוין')}</p></div>`;
+  }
+
+  document.getElementById('startWizardBtn').addEventListener('click', ()=>{
+    document.getElementById('introScreen').style.display = 'none';
+    document.getElementById('wizardShell').style.display = 'block';
+    setWizardStep(0);
+  });
+
+  document.getElementById('wizardBackBtn').addEventListener('click', ()=>setWizardStep(wizardStep - 1));
+  document.getElementById('wizardNextBtn').addEventListener('click', ()=>{
+    if (wizardStep < wizardPanels.length - 1){
+      if (validateWizardStep(wizardStep)) setWizardStep(wizardStep + 1);
+      return;
+    }
+    document.getElementById('submitBtn').click();
+  });
+
+  const validators = {
+    fullName: v => /^[a-zA-Zא-ת][a-zA-Zא-ת\s'׳\-]*$/.test(v.trim()) && v.trim().length > 0,
+    phone: v => {
+      const digits = v.replace(/\D/g, '');
+      return digits.length === 9 || digits.length === 10;
+    },
+    email: v => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v.trim()),
+    rank: v => v.trim().length > 0,
+    years: v => v.trim().length > 0,
+    role: v => v.trim().length > 0
+  };
+
+  function validateField(id){
+    const el = document.getElementById(id);
+    const field = el.closest('.field');
+    const isValid = validators[id](el.value);
+    field.classList.toggle('invalid', !isValid);
+    return isValid;
+  }
+
+  // clear error as soon as the person fixes it
+  Object.keys(validators).forEach(id=>{
+    const el = document.getElementById(id);
+    el.addEventListener('input', ()=>{
+      if (el.closest('.field').classList.contains('invalid')) validateField(id);
+    });
+  });
+
+  function val(id){ return document.getElementById(id).value.trim(); }
+  function checkedDetail(triggerTarget){
+    const cb = document.querySelector(`.toggle-trigger[data-target="${triggerTarget}"]`);
+    if (!cb.checked) return null;
+    return document.querySelector(`#${triggerTarget} textarea`).value.trim() || 'כן, ללא פירוט נוסף';
+  }
+
+  let additionalRoleCount = 0;
+
+  function addAdditionalRole(data = {}){
+    additionalRoleCount += 1;
+    const id = additionalRoleCount;
+    const wrap = document.getElementById('additionalRoles');
+    const card = document.createElement('div');
+    card.className = 'additional-role-card';
+    card.dataset.roleId = id;
+    card.innerHTML = `
+      <div class="additional-role-title">
+        <strong>תפקיד נוסף ${id}</strong>
+        <button type="button" class="remove-role-btn">הסר</button>
+      </div>
+      <div class="field">
+        <label>שם התפקיד</label>
+        <input type="text" class="additional-role-name" placeholder="לדוגמה: מפקד מערך תחזוקה" value="${escapeHtml(data.name || '')}">
+      </div>
+      <div class="row2">
+        <div class="field">
+          <label>משנת</label>
+          <input type="text" inputmode="numeric" class="additional-role-from" placeholder="לדוגמה: 2014" value="${escapeHtml(data.from || '')}">
+        </div>
+        <div class="field">
+          <label>עד שנת</label>
+          <input type="text" inputmode="numeric" class="additional-role-to" placeholder="לדוגמה: 2020" value="${escapeHtml(data.to || '')}">
+        </div>
+      </div>
+      <div class="field">
+        <label>מה עשית בתפקיד?</label>
+        <textarea class="additional-role-description" placeholder="תחומי אחריות, צוותים, פרויקטים, ממשקים ותוצאות">${escapeHtml(data.description || '')}</textarea>
+      </div>
+      <div class="field" style="margin-bottom:0;">
+        <label>הישג מרכזי בתפקיד <span class="hint">(לא חובה)</span></label>
+        <textarea class="additional-role-achievement" placeholder="לדוגמה: הובלתי שינוי שקיצר זמני טיפול או שיפר זמינות">${escapeHtml(data.achievement || '')}</textarea>
+      </div>`;
+    card.querySelector('.remove-role-btn').addEventListener('click', ()=>card.remove());
+    wrap.appendChild(card);
+  }
+
+  function collectAdditionalRoles(){
+    return Array.from(document.querySelectorAll('.additional-role-card')).map(card => ({
+      name: card.querySelector('.additional-role-name').value.trim(),
+      from: card.querySelector('.additional-role-from').value.trim(),
+      to: card.querySelector('.additional-role-to').value.trim(),
+      description: card.querySelector('.additional-role-description').value.trim(),
+      achievement: card.querySelector('.additional-role-achievement').value.trim()
+    })).filter(role => role.name || role.from || role.to || role.description || role.achievement);
+  }
+
+  document.getElementById('addRoleBtn').addEventListener('click', ()=>addAdditionalRole());
+
+  function collectData(){
+    return {
+      fullName: val('fullName'),
+      phone: val('phone'),
+      email: val('email'),
+      rank: val('rank'),
+      years: val('years'),
+      role: val('role'),
+      roleFrom: val('roleFrom'),
+      roleTo: val('roleTo'),
+      additionalRoles: collectAdditionalRoles(),
+      managedPeople: checkedDetail('peopleDetail'),
+      managedBudget: checkedDetail('budgetDetail'),
+      training: checkedDetail('trainingDetail'),
+      achievements: val('achievements'),
+      skills: val('skills'),
+      education: val('education'),
+      courses: val('courses'),
+      languages: val('languages')
+    };
+  }
+
+  // ===== פיענוג ותצוגה של קורות חיים בפורמט מובנה =====
+  const SECTION_HEADERS = ['תקציר מקצועי', 'ניסיון תעסוקתי', 'תפקידים נוספים', 'כישורים', 'השכלה', 'הכשרות וקורסים', 'שפות'];
+
+  function parseResumeText(raw){
+    const nonEmpty = raw.split('\n').map(l => l.trim()).filter(l => l.length > 0);
+    const name = nonEmpty[0] || '';
+    const contact = nonEmpty[1] || '';
+    const sections = [];
+    let current = null;
+
+    for (let i = 2; i < nonEmpty.length; i++){
+      const line = nonEmpty[i];
+      if (SECTION_HEADERS.includes(line)){
+        current = { header: line, bullets: [], paragraphs: [] };
+        sections.push(current);
+      } else if (current){
+        if (line.startsWith('•')) current.bullets.push(line.replace(/^•\s*/, ''));
+        else current.paragraphs.push(line);
+      }
+    }
+    return { name, contact, sections };
+  }
+
+  function escapeHtml(s){
+    return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+  }
+
+  function renderResumeHTML(parsed){
+    let html = `<div class="r-name">${escapeHtml(parsed.name)}</div>`;
+    html += `<div class="r-contact">${escapeHtml(parsed.contact)}</div>`;
+    parsed.sections.forEach(sec => {
+      html += `<div class="r-section">${escapeHtml(sec.header)}</div>`;
+      sec.paragraphs.forEach(p => { html += `<div class="r-para">${escapeHtml(p)}</div>`; });
+      if (sec.bullets.length){
+        html += '<ul class="r-list">' + sec.bullets.map(b => `<li>• ${escapeHtml(b)}</li>`).join('') + '</ul>';
+      }
+    });
+    return html;
+  }
+
+  async function downloadWord(text, filenameBase){
+    const response = await fetch('/api/docx', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ text, password: appPassword })
+    });
+    if (response.status === 401){
+      sessionStorage.removeItem('appPassword');
+      document.getElementById('gate').style.display = 'flex';
+      document.getElementById('mainWrap').style.display = 'none';
+      return;
+    }
+    if (!response.ok){
+      alert('אירעה שגיאה ביצירת קובץ ה-Word. נסה/י שוב.');
+      return;
+    }
+    const blob = await response.blob();
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = filenameBase + '.docx';
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    URL.revokeObjectURL(url);
+  }
+
+  async function generateLinkedin(baseResume){
+    const response = await fetch('/api/generate', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ mode: 'linkedin', baseResume, password: appPassword })
+    });
+    const result = await response.json();
+    if (response.status === 401){
+      sessionStorage.removeItem('appPassword');
+      document.getElementById('gate').style.display = 'flex';
+      document.getElementById('mainWrap').style.display = 'none';
+      throw new Error('session expired');
+    }
+    if (!response.ok || !result.resume) throw new Error(result.error || 'linkedin failed');
+    return result.resume;
+  }
+
+  async function generateInterview(baseResume, targetJob){
+    const response = await fetch('/api/generate', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ mode: 'interview', baseResume, targetJob, password: appPassword })
+    });
+    const result = await response.json();
+    if (response.status === 401){
+      sessionStorage.removeItem('appPassword');
+      document.getElementById('gate').style.display = 'flex';
+      document.getElementById('mainWrap').style.display = 'none';
+      throw new Error('session expired');
+    }
+    if (!response.ok || !result.resume) throw new Error(result.error || 'interview prep failed');
+    return result.resume;
+  }
+
+  async function generateResume(data){
+    const response = await fetch('/api/generate', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ ...data, password: appPassword })
+    });
+
+    const result = await response.json();
+    if (response.status === 401) {
+      sessionStorage.removeItem('appPassword');
+      document.getElementById('gate').style.display = 'flex';
+      document.getElementById('mainWrap').style.display = 'none';
+      throw new Error('session expired');
+    }
+    if (!response.ok || !result.resume) {
+      throw new Error(result.error || 'generation failed');
+    }
+    return result.resume;
+  }
+
+  async function tailorResume(baseResume, targetJob){
+    const response = await fetch('/api/generate', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ mode: 'tailor', baseResume, targetJob, password: appPassword })
+    });
+
+    const result = await response.json();
+    if (response.status === 401) {
+      sessionStorage.removeItem('appPassword');
+      document.getElementById('gate').style.display = 'flex';
+      document.getElementById('mainWrap').style.display = 'none';
+      throw new Error('session expired');
+    }
+    if (!response.ok || !result.resume) {
+      throw new Error(result.error || 'tailoring failed');
+    }
+    return result.resume;
+  }
+
+  let generationStatusTimer = null;
+  function showGenerationOverlay(options = {}){
+    const overlay = document.getElementById('generationOverlay');
+    const title = document.getElementById('generationTitle');
+    const status = document.getElementById('generationStatus');
+    const note = document.getElementById('generationNote');
+    const messages = options.messages || [
+      'מנתחים את הניסיון שמילאת...',
+      'מתרגמים את הניסיון הצבאי לשפה אזרחית...',
+      'מדגישים אחריות, ניהול והישגים...',
+      'מסדרים את המידע לקורות חיים מקצועיים...'
+    ];
+    title.textContent = options.title || 'אנחנו בונים את קורות החיים שלך';
+    note.textContent = options.note || 'זה עשוי לקחת עד כחצי דקה. אין צורך ללחוץ שוב.';
+    let i = 0;
+    status.textContent = messages[0];
+    overlay.classList.add('show');
+    document.body.style.overflow = 'hidden';
+    generationStatusTimer = setInterval(()=>{
+      i = (i + 1) % messages.length;
+      status.textContent = messages[i];
+    }, 3500);
+  }
+
+  function hideGenerationOverlay(){
+    document.getElementById('generationOverlay').classList.remove('show');
+    document.body.style.overflow = '';
+    if (generationStatusTimer){
+      clearInterval(generationStatusTimer);
+      generationStatusTimer = null;
     }
   }
 
-  return {
-    name,
-    contact,
-    sections
-  };
-}
+  document.getElementById('cvForm').addEventListener('submit', async (e)=>{
+    e.preventDefault();
+    const ids = Object.keys(validators);
+    const results = ids.map(validateField);
+    const firstInvalidIndex = results.indexOf(false);
 
-function escapeXml(s) {
-  return String(s)
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;')
-    .replace(/'/g, '&apos;');
-}
+    if (firstInvalidIndex !== -1) {
+      document.getElementById(ids[firstInvalidIndex]).closest('.field')
+        .scrollIntoView({behavior:'smooth', block:'center'});
+      return;
+    }
 
-function buildParagraph(
-  text,
-  {
-    bold = false,
-    size = null,
-    color = null,
-    align = 'start',
-    spaceBefore = 0,
-    spaceAfter = 100,
-    line = 300
-  } = {}
-) {
-  const rPr = [
-    '<w:rFonts w:ascii="Arial" w:hAnsi="Arial" w:cs="Arial" w:eastAsia="Arial"/>',
-    bold ? '<w:b/><w:bCs/>' : '',
-    size
-      ? `<w:sz w:val="${size}"/><w:szCs w:val="${size}"/>`
-      : '',
-    color
-      ? `<w:color w:val="${color}"/>`
-      : '',
-    '<w:rtl/>',
-    '<w:lang w:val="he-IL" w:eastAsia="he-IL" w:bidi="he-IL"/>'
-  ].join('');
+    const btn = document.getElementById('submitBtn');
+    const errorBanner = document.getElementById('apiError');
+    errorBanner.classList.remove('show');
+    btn.disabled = true;
+    btn.innerHTML = '<span class="spinner"></span>יוצר קורות חיים...';
+    showGenerationOverlay();
 
-  const alignment =
-    align === 'center'
-      ? 'center'
-      : 'start';
+    try {
+      const data = collectData();
+      const resumeText = await generateResume(data);
 
-  const spacing =
-    `<w:spacing ` +
-    `w:before="${spaceBefore}" ` +
-    `w:after="${spaceAfter}" ` +
-    `w:line="${line}" ` +
-    `w:lineRule="auto"/>`;
+      const resultCard = document.getElementById('resultCard');
+      const tailorCard = document.getElementById('tailorCard');
+      document.getElementById('resultBox').innerHTML = renderResumeHTML(parseResumeText(resumeText));
+      resultCard.style.display = '';
+      document.getElementById('wizardShell').style.display = 'none';
+      resultCard.scrollIntoView({behavior:'smooth', block:'start'});
+    } catch (err) {
+      console.error(err);
+      errorBanner.classList.add('show');
+    } finally {
+      hideGenerationOverlay();
+      btn.disabled = false;
+      btn.textContent = 'צור קורות חיים גנריים';
+    }
+  });
 
-  return `
-<w:p>
-  <w:pPr>
-    <w:bidi/>
-    <w:jc w:val="${alignment}"/>
-    ${spacing}
-    <w:rPr>${rPr}</w:rPr>
-  </w:pPr>
-  <w:r>
-    <w:rPr>${rPr}</w:rPr>
-    <w:t xml:space="preserve">${escapeXml(text)}</w:t>
-  </w:r>
-</w:p>`;
-}
-
-function buildDocumentXml(parsed) {
-  const paragraphs = [];
-
-  // שם מלא - ממורכז
-  paragraphs.push(
-    buildParagraph(
-      parsed.name,
-      {
-        bold: true,
-        size: 36,
-        align: 'center',
-        spaceBefore: 0,
-        spaceAfter: 60,
-        line: 280
-      }
-    )
-  );
-
-  // טלפון + אימייל - ממורכז
-  paragraphs.push(
-    buildParagraph(
-      parsed.contact,
-      {
-        size: 20,
-        color: '5B6270',
-        align: 'center',
-        spaceBefore: 0,
-        spaceAfter: 260,
-        line: 260
-      }
-    )
-  );
-
-  parsed.sections.forEach(sec => {
-    // כותרת סעיף
-    paragraphs.push(
-      buildParagraph(
-        sec.header,
-        {
-          bold: true,
-          size: 24,
-          color: '57623F',
-          spaceBefore: 220,
-          spaceAfter: 90,
-          line: 280
-        }
-      )
-    );
-
-    // פסקאות רגילות
-    sec.paragraphs.forEach(p => {
-      paragraphs.push(
-        buildParagraph(
-          p,
-          {
-            spaceBefore: 0,
-            spaceAfter: 110,
-            line: 300
-          }
-        )
-      );
-    });
-
-    // בולטים
-    sec.bullets.forEach(b => {
-      paragraphs.push(
-        buildParagraph(
-          `•  ${b}`,
-          {
-            spaceBefore: 0,
-            spaceAfter: 70,
-            line: 290
-          }
-        )
-      );
+  document.getElementById('copyBtn').addEventListener('click', ()=>{
+    const text = document.getElementById('resultBox').innerText;
+    navigator.clipboard.writeText(text).then(()=>{
+      const btn = document.getElementById('copyBtn');
+      const original = btn.textContent;
+      btn.textContent = 'הועתק ✓';
+      setTimeout(()=>{ btn.textContent = original; }, 1800);
     });
   });
 
-  return `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
-<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">
-  <w:body>
-
-${paragraphs.join('\n')}
-
-    <w:sectPr>
-      <w:bidi/>
-
-      <w:pgSz
-        w:w="11906"
-        w:h="16838"
-      />
-
-      <w:pgMar
-        w:top="1417"
-        w:right="1700"
-        w:bottom="1417"
-        w:left="1700"
-        w:header="708"
-        w:footer="708"
-        w:gutter="0"
-      />
-    </w:sectPr>
-
-  </w:body>
-</w:document>`;
-}
-
-const STYLES_XML = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
-<w:styles xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">
-
-  <w:docDefaults>
-
-    <w:rPrDefault>
-      <w:rPr>
-        <w:rFonts
-          w:ascii="Arial"
-          w:hAnsi="Arial"
-          w:cs="Arial"
-          w:eastAsia="Arial"
-        />
-        <w:rtl/>
-        <w:lang
-          w:val="he-IL"
-          w:eastAsia="he-IL"
-          w:bidi="he-IL"
-        />
-      </w:rPr>
-    </w:rPrDefault>
-
-    <w:pPrDefault>
-      <w:pPr>
-        <w:bidi/>
-        <w:jc w:val="start"/>
-        <w:spacing
-          w:after="100"
-          w:line="300"
-          w:lineRule="auto"
-        />
-      </w:pPr>
-    </w:pPrDefault>
-
-  </w:docDefaults>
-
-  <w:style
-    w:type="paragraph"
-    w:default="1"
-    w:styleId="Normal"
-  >
-    <w:name w:val="Normal"/>
-    <w:qFormat/>
-  </w:style>
-
-</w:styles>`;
-
-const CONTENT_TYPES_XML = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
-<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types">
-
-  <Default
-    Extension="rels"
-    ContentType="application/vnd.openxmlformats-package.relationships+xml"
-  />
-
-  <Default
-    Extension="xml"
-    ContentType="application/xml"
-  />
-
-  <Override
-    PartName="/word/document.xml"
-    ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml"
-  />
-
-  <Override
-    PartName="/word/styles.xml"
-    ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.styles+xml"
-  />
-
-</Types>`;
-
-const RELS_XML = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
-<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">
-
-  <Relationship
-    Id="rId1"
-    Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument"
-    Target="word/document.xml"
-  />
-
-</Relationships>`;
-
-const DOCUMENT_RELS_XML = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
-<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">
-
-  <Relationship
-    Id="rId1"
-    Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/styles"
-    Target="styles.xml"
-  />
-
-</Relationships>`;
-
-async function buildDocx(parsed) {
-  const zip = new JSZip();
-
-  zip.file(
-    '[Content_Types].xml',
-    CONTENT_TYPES_XML
-  );
-
-  zip
-    .folder('_rels')
-    .file(
-      '.rels',
-      RELS_XML
-    );
-
-  const wordFolder = zip.folder('word');
-
-  wordFolder.file(
-    'document.xml',
-    buildDocumentXml(parsed)
-  );
-
-  wordFolder.file(
-    'styles.xml',
-    STYLES_XML
-  );
-
-  wordFolder
-    .folder('_rels')
-    .file(
-      'document.xml.rels',
-      DOCUMENT_RELS_XML
-    );
-
-  return zip.generateAsync({
-    type: 'nodebuffer'
+  document.getElementById('printBtn').addEventListener('click', ()=>{
+    document.body.classList.remove('printing-tailored');
+    window.print();
   });
-}
 
-module.exports = async (req, res) => {
-  if (req.method !== 'POST') {
-    res
-      .status(405)
-      .json({
-        error: 'Method not allowed'
-      });
+  document.getElementById('wordBtn').addEventListener('click', ()=>{
+    const text = document.getElementById('resultBox').innerText;
+    const name = document.getElementById('fullName').value.trim() || 'קורות-חיים';
+    downloadWord(text, `קורות-חיים-${name}`);
+  });
 
-    return;
-  }
 
-  if (!process.env.APP_PASSWORD) {
-    res
-      .status(500)
-      .json({
-        error: 'server not configured'
-      });
+  document.getElementById('openTailorBtn').addEventListener('click', ()=>{
+    document.getElementById('linkedinBox').style.display = 'none';
+    const tailorCard = document.getElementById('tailorCard');
+    tailorCard.style.display = 'block';
+    tailorCard.scrollIntoView({behavior:'smooth', block:'start'});
+  });
 
-    return;
-  }
+  document.getElementById('closeTailorBtn').addEventListener('click', ()=>{
+    document.getElementById('tailorCard').style.display = 'none';
+    document.getElementById('resultCard').scrollIntoView({behavior:'smooth', block:'end'});
+  });
 
-  const body = req.body || {};
+  document.getElementById('closeLinkedinBtn').addEventListener('click', ()=>{
+    document.getElementById('linkedinBox').style.display = 'none';
+  });
 
-  if (body.password !== process.env.APP_PASSWORD) {
-    res
-      .status(401)
-      .json({
-        error: 'wrong password'
-      });
+  document.getElementById('openLinkedinBtn').addEventListener('click', async ()=>{
+    document.getElementById('tailorCard').style.display = 'none';
+    const box = document.getElementById('linkedinBox');
+    const loading = document.getElementById('linkedinLoading');
+    const status = document.getElementById('linkedinStatus');
+    const wrap = document.getElementById('linkedinResultWrap');
+    const errorBanner = document.getElementById('linkedinError');
+    const btn = document.getElementById('openLinkedinBtn');
 
-    return;
-  }
+    box.style.display = '';
+    errorBanner.classList.remove('show');
+    wrap.style.display = 'none';
+    loading.style.display = 'flex';
+    status.textContent = 'יוצרים תקציר מקצועי על בסיס קורות החיים...';
+    btn.disabled = true;
+    btn.querySelector('strong').textContent = 'יוצר Bio...';
+    box.scrollIntoView({behavior:'smooth', block:'center'});
 
-  if (!body.text) {
-    res
-      .status(400)
-      .json({
-        error: 'missing text'
-      });
+    try {
+      const baseResume = document.getElementById('resultBox').innerText;
+      const text = await generateLinkedin(baseResume);
+      document.getElementById('linkedinResultBox').textContent = text;
+      loading.style.display = 'none';
+      status.textContent = 'ה-Bio מוכן. אפשר לערוך אותו ישירות ולהעתיק ל-LinkedIn.';
+      wrap.style.display = '';
+    } catch (err) {
+      console.error(err);
+      loading.style.display = 'none';
+      status.textContent = 'לא הצלחנו ליצור את ה-Bio.';
+      errorBanner.classList.add('show');
+    } finally {
+      btn.disabled = false;
+      btn.querySelector('strong').textContent = 'צור Bio ל-LinkedIn';
+    }
+  });
 
-    return;
-  }
+  document.getElementById('copyLinkedinBtn').addEventListener('click', ()=>{
+    const text = document.getElementById('linkedinResultBox').innerText;
+    navigator.clipboard.writeText(text).then(()=>{
+      const btn = document.getElementById('copyLinkedinBtn');
+      const original = btn.textContent;
+      btn.textContent = 'הועתק ✓';
+      setTimeout(()=>{ btn.textContent = original; }, 1800);
+    });
+  });
 
-  try {
-    const parsed = parseResumeText(
-      body.text
-    );
+  document.getElementById('tailorBtn').addEventListener('click', async ()=>{
+    const targetJob = document.getElementById('targetJob').value.trim();
+    const errorBanner = document.getElementById('tailorError');
+    errorBanner.classList.remove('show');
 
-    const buffer = await buildDocx(
-      parsed
-    );
+    if (!targetJob) {
+      document.getElementById('targetJob').closest('.field').scrollIntoView({behavior:'smooth', block:'center'});
+      return;
+    }
 
-    res.setHeader(
-      'Content-Type',
-      'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
-    );
+    const btn = document.getElementById('tailorBtn');
+    btn.disabled = true;
+    btn.innerHTML = '<span class="spinner"></span>מתאים קורות חיים...';
 
-    res.setHeader(
-      'Content-Disposition',
-      'attachment; filename="resume.docx"'
-    );
+    try {
+      const baseResume = document.getElementById('resultBox').innerText;
+      const tailoredText = await tailorResume(baseResume, targetJob);
 
-    res
-      .status(200)
-      .send(buffer);
+      document.getElementById('tailorResultBox').innerHTML = renderResumeHTML(parseResumeText(tailoredText));
+      const wrap = document.getElementById('tailorResultWrap');
+      wrap.style.display = '';
+      wrap.scrollIntoView({behavior:'smooth', block:'start'});
+    } catch (err) {
+      console.error(err);
+      errorBanner.classList.add('show');
+    } finally {
+      btn.disabled = false;
+      btn.textContent = 'התאם קורות חיים למשרה';
+    }
+  });
 
-  } catch (err) {
-    console.error(
-      'docx error:',
-      err
-    );
+  document.getElementById('copyTailorBtn').addEventListener('click', ()=>{
+    const text = document.getElementById('tailorResultBox').innerText;
+    navigator.clipboard.writeText(text).then(()=>{
+      const btn = document.getElementById('copyTailorBtn');
+      const original = btn.textContent;
+      btn.textContent = 'הועתק ✓';
+      setTimeout(()=>{ btn.textContent = original; }, 1800);
+    });
+  });
 
-    res
-      .status(500)
-      .json({
-        error: 'docx generation failed'
-      });
-  }
-};
+  document.getElementById('printTailorBtn').addEventListener('click', ()=>{
+    document.body.classList.add('printing-tailored');
+    window.print();
+  });
+
+  document.getElementById('wordTailorBtn').addEventListener('click', ()=>{
+    const text = document.getElementById('tailorResultBox').innerText;
+    const name = document.getElementById('fullName').value.trim() || 'קורות-חיים';
+    downloadWord(text, `קורות-חיים-מותאמים-${name}`);
+  });
+
+  document.getElementById('interviewBtn').addEventListener('click', async ()=>{
+    const errorBanner = document.getElementById('interviewError');
+    errorBanner.classList.remove('show');
+    const btn = document.getElementById('interviewBtn');
+    btn.disabled = true;
+    btn.innerHTML = '<span class="spinner"></span>מכין שאלות...';
+    showGenerationOverlay({
+      title: 'מכינים אותך לראיון',
+      messages: [
+        'קוראים את דרישות המשרה...',
+        'משווים אותן לניסיון שלך...',
+        'מזהים נקודות חוזקה ופערים...',
+        'מנסחים שאלות והכוונה לתשובות...'
+      ],
+      note: 'התהליך עשוי לקחת כמה עשרות שניות. אין צורך ללחוץ שוב.'
+    });
+
+    try {
+      const baseResume = document.getElementById('tailorResultBox').innerText;
+      const targetJob = document.getElementById('targetJob').value.trim();
+      const text = await generateInterview(baseResume, targetJob);
+      document.getElementById('interviewResultBox').textContent = text;
+      document.getElementById('interviewResultWrap').style.display = '';
+    } catch (err) {
+      console.error(err);
+      errorBanner.classList.add('show');
+    } finally {
+      hideGenerationOverlay();
+      btn.disabled = false;
+      btn.textContent = 'הכן אותי לראיון';
+    }
+  });
+
+  document.getElementById('copyInterviewBtn').addEventListener('click', ()=>{
+    const text = document.getElementById('interviewResultBox').innerText;
+    navigator.clipboard.writeText(text).then(()=>{
+      const btn = document.getElementById('copyInterviewBtn');
+      const original = btn.textContent;
+      btn.textContent = 'הועתק ✓';
+      setTimeout(()=>{ btn.textContent = original; }, 1800);
+    });
+  });
+
+  window.addEventListener('afterprint', ()=>{
+    document.body.classList.remove('printing-tailored');
+  });
+
+
+</script>
+
+</body>
+</html>
