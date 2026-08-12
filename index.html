@@ -1304,11 +1304,14 @@
     for (let i = 2; i < nonEmpty.length; i++){
       const line = nonEmpty[i];
       if (SECTION_HEADERS.includes(line)){
-        current = { header: line, bullets: [], paragraphs: [] };
+        current = { header: line, items: [] };
         sections.push(current);
       } else if (current){
-        if (line.startsWith('•')) current.bullets.push(line.replace(/^•\s*/, ''));
-        else current.paragraphs.push(line);
+        if (line.startsWith('•')) {
+          current.items.push({ type: 'bullet', text: line.replace(/^•\s*/, '') });
+        } else {
+          current.items.push({ type: 'paragraph', text: line });
+        }
       }
     }
     return { name, contact, sections };
@@ -1323,10 +1326,25 @@
     html += `<div class="r-contact">${escapeHtml(parsed.contact)}</div>`;
     parsed.sections.forEach(sec => {
       html += `<div class="r-section">${escapeHtml(sec.header)}</div>`;
-      sec.paragraphs.forEach(p => { html += `<div class="r-para">${escapeHtml(p)}</div>`; });
-      if (sec.bullets.length){
-        html += '<ul class="r-list">' + sec.bullets.map(b => `<li>• ${escapeHtml(b)}</li>`).join('') + '</ul>';
-      }
+      let listOpen = false;
+
+      sec.items.forEach(item => {
+        if (item.type === 'bullet') {
+          if (!listOpen) {
+            html += '<ul class="r-list">';
+            listOpen = true;
+          }
+          html += `<li>• ${escapeHtml(item.text)}</li>`;
+        } else {
+          if (listOpen) {
+            html += '</ul>';
+            listOpen = false;
+          }
+          html += `<div class="r-para">${escapeHtml(item.text)}</div>`;
+        }
+      });
+
+      if (listOpen) html += '</ul>';
     });
     return html;
   }
