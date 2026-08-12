@@ -9,6 +9,9 @@ const GENERATE_SYSTEM_PROMPT = `אתה כותב קורות חיים מקצועי
 קיבלת מידע גולמי על מועמד. כתוב עבורו קורות חיים בעברית, מוכנים לשימוש, לפי הכללים הבאים:
 - שורה ראשונה: שם מלא בלבד. שורה שנייה: טלפון ואימייל מופרדים ב-" | ". שורה שלישית - ריקה.
 - אחריהן הסעיפים: תקציר מקצועי (2-3 משפטים), ניסיון תעסוקתי, כישורים, השכלה והכשרות, שפות (רק אם צוינו).
+- אם נמסרו כמה תפקידים לאורך השירות, תחת "ניסיון תעסוקתי" הצג קודם שורת מסגרת: "צה\"ל | <שנות השירות הכוללות>". מתחתיה הצג כל תפקיד בנפרד, מהחדש לישן, בשורה: "<שם התפקיד> | <משנת>-<עד שנת>", ואחריה הבולטים הרלוונטיים לאותו תפקיד.
+- חובה לכלול בקורות החיים כל תפקיד נוסף שנמסר בקלט. אין להשמיט תפקיד נוסף, גם אם הוא פחות רלוונטי או אם המידע עליו קצר.
+- אם נמסר רק תפקיד אחד, שמור על המבנה הרגיל ואין חובה ליצור חלוקה פנימית לתפקידים.
 - ${SECTION_HEADERS_NOTE}
 - תרגם דרגות, יחידות וראשי תיבות צבאיים לתפקידים ומונחים אזרחיים מקבילים ומובנים למגייס שלא מכיר את הצבא. הבן את משמעות התפקיד לפי ההקשר המלא שניתן, גם אם זה צירוף לא נפוץ - אל תישען על מילון קבוע.
 - הראה הבנה אמיתית של התפקיד: התבסס על הידע הכללי שלך לגבי מה תפקיד כזה כולל בפועל (סוג האחריות, סביבת העבודה, הכישורים הנדרשים) ושלב את זה בניסוח - אל תסתפק בהעתקה/תרגום מילולי של מה שהמועמד כתב. עם זאת, נתונים מדידים ספציפיים (כמויות, אחוזים, תקציבים, הישגים קונקרטיים) - רק אם ניתנו, אל תמציא כאלה.
@@ -47,7 +50,24 @@ function buildGeneratePrompt(data) {
     `שנות שירות: ${data.years || ''}`,
     `תפקיד אחרון/עיקרי: ${data.role || ''}`
   ];
-  if (data.rolesHistory) lines.push(`תפקידים מרכזיים נוספים: ${data.rolesHistory}`);
+
+  if (data.roleFrom || data.roleTo) {
+    lines.push(`תקופת התפקיד האחרון/העיקרי: ${data.roleFrom || ''}-${data.roleTo || ''}`);
+  }
+
+  if (Array.isArray(data.additionalRoles) && data.additionalRoles.length) {
+    lines.push('תפקידים מרכזיים נוספים:');
+    data.additionalRoles.forEach((role, index) => {
+      lines.push(`תפקיד נוסף ${index + 1}:`);
+      lines.push(`שם התפקיד: ${role.name || ''}`);
+      lines.push(`תקופה: ${role.from || ''}-${role.to || ''}`);
+      if (role.description) lines.push(`מה עשיתי בתפקיד: ${role.description}`);
+      if (role.achievement) lines.push(`הישג מרכזי בתפקיד: ${role.achievement}`);
+    });
+  } else if (data.rolesHistory) {
+    // תאימות לאחור לגרסאות ישנות של הטופס
+    lines.push(`תפקידים מרכזיים נוספים: ${data.rolesHistory}`);
+  }
   if (data.managedPeople) lines.push(`ניהול אנשים: ${data.managedPeople}`);
   if (data.managedBudget) lines.push(`ניהול תקציב/ציוד: ${data.managedBudget}`);
   if (data.training) lines.push(`הדרכה/הכשרה: ${data.training}`);
@@ -143,7 +163,7 @@ module.exports = async (req, res) => {
         return;
       }
       const userContent = `קורות החיים המותאמים:\n${body.baseResume}\n\nהמשרה/תפקיד:\n${body.targetJob}`;
-      const text = await callClaude(INTERVIEW_SYSTEM_PROMPT, userContent, 2200);
+      const text = await callClaude(INTERVIEW_SYSTEM_PROMPT, userContent, 1400);
       res.status(200).json({ resume: text });
       return;
     }
