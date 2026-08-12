@@ -195,6 +195,9 @@ function buildDocumentXml(parsed) {
     }
 
     // כל שאר הסעיפים נשארים בעיצוב הקיים, תוך שמירה על סדר הפלט.
+    // בהשכלה ובהכשרות מדגישים את שורות התוכן כדי ליצור היררכיה ברורה יותר.
+    const emphasizeEntries = sec.header === 'השכלה' || sec.header === 'הכשרות וקורסים';
+
     sec.items.forEach(item => {
       if (item.type === 'bullet') {
         paragraphs.push(buildParagraph(`•  ${item.text}`, {
@@ -203,6 +206,8 @@ function buildDocumentXml(parsed) {
         }));
       } else {
         paragraphs.push(buildParagraph(item.text, {
+          bold: emphasizeEntries,
+          color: emphasizeEntries ? '2C4058' : null,
           spaceAfter: 90,
           line: 288
         }));
